@@ -31,6 +31,7 @@ import agentAgendaRoutes from './routes/agentAgenda.js';
 import seoMonitorRoutes from './routes/seo-monitor.js';
 import agentsBlogSessionRoutes from './routes/agents-blog-session.js';
 import directMessagesRoutes from './routes/directMessages.js';
+import notificationsRoutes from './routes/notifications.js';
 import { cmsLogger } from './middleware/logger.js';
 import { 
   initializeSecurityMiddleware, 
@@ -121,7 +122,9 @@ const allowedOrigins = process.env.FRONTEND_URL
       'http://localhost:5174',
       'http://127.0.0.1:5173',
       'https://thadoconsulting.vercel.app',
-      'https://thado-web.vercel.app'
+      'https://thado-web.vercel.app',
+      'https://www.thadoconsulting.com',
+      'https://thadoconsulting.com'
     ];
 
 const corsOptions = {
@@ -475,6 +478,7 @@ app.use('/api/contact', contactLimiter, contactRoutes); // 📧 Contact Routes (
 app.use('/api/users', authLimiter, usersRoutes);
 app.use('/api/admin', authLimiter, adminRoutes);
 app.use('/api/profile', authLimiter, profileRoutes); // 👤 Profile Routes (Social System)
+app.use('/api/notifications', authLimiter, notificationsRoutes); // 🔔 Notifications Routes
 
 // Rutas de AI con rate limiting específico (costosas en recursos)
 app.use('/api/agents', aiChatLimiter, agentsRoutes); // 🤖 AI Agents System Routes
