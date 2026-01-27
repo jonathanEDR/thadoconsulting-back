@@ -28,7 +28,7 @@ export const generateAIMetadata = (post, analysis = null) => {
     // Identificación
     id: post._id?.toString() || post.slug,
     slug: post.slug,
-    url: `https://web-scuti.com/blog/${post.slug}`,
+    url: `https://www.thadoconsulting.com/blog/${post.slug}`,
     
     // Contenido básico
     title: post.title,

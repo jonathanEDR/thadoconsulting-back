@@ -16,8 +16,8 @@ const emailConfig = {
   replyTo: process.env.EMAIL_REPLY_TO || 'contacto@thadoconsulting.pe',
   
   // URLs del sistema
-  appUrl: process.env.APP_URL || 'https://thadoconsulting.pe',
-  portalUrl: process.env.PORTAL_URL || 'https://portal.thadoconsulting.pe',
+  appUrl: process.env.APP_URL || 'https://www.thadoconsulting.com',
+  portalUrl: process.env.PORTAL_URL || 'https://www.thadoconsulting.com',
   
   // Configuración de emails
   maxRetries: 3,

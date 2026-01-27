@@ -54,11 +54,11 @@ export const createWelcomeOnboarding = async (userData) => {
     // 3. CREAR ACTIVIDAD DE ONBOARDING
     await welcomeLead.lead.agregarActividad(
       'nota',
-      '🎉 ¡Bienvenido a SCUTI Company! Hemos iniciado tu proceso de onboarding automático. Pronto nos pondremos en contacto contigo.',
+      '🎉 ¡Bienvenido a THADO Consulting! Hemos iniciado tu proceso de onboarding automático. Pronto nos pondremos en contacto contigo.',
       {
         id: 'system',
         fullName: 'Sistema de Onboarding',
-        email: 'system@scuticompany.com'
+        email: 'system@thadoconsulting.com'
       }
     );
 

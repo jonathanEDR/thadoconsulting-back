@@ -31,7 +31,7 @@ const cleanText = (text, maxLength = 160) => {
 /**
  * Generar meta tags para un post del blog
  * @param {object} post - Objeto del post
- * @param {string} baseUrl - URL base del sitio (ej: https://web-scuti.com)
+ * @param {string} baseUrl - URL base del sitio (ej: https://www.thadoconsulting.com)
  * @returns {object} - Meta tags generados
  */
 export const generatePostMetaTags = (post, baseUrl = '') => {

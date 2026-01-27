@@ -54,7 +54,7 @@ const cleanHtmlForFeed = (html, maxLength = 500) => {
  * @param {number} limit - Número máximo de posts a incluir
  * @returns {Promise<string>} - XML del RSS feed
  */
-export const generateRSSFeed = async (baseUrl = 'https://web-scuti.com', limit = 50) => {
+export const generateRSSFeed = async (baseUrl = 'https://www.thadoconsulting.com', limit = 50) => {
   try {
     const posts = await BlogPost.find({
       isPublished: true,
@@ -132,7 +132,7 @@ ${items}
  * @param {number} limit - Número máximo de posts a incluir
  * @returns {Promise<string>} - XML del Atom feed
  */
-export const generateAtomFeed = async (baseUrl = 'https://web-scuti.com', limit = 50) => {
+export const generateAtomFeed = async (baseUrl = 'https://www.thadoconsulting.com', limit = 50) => {
   try {
     const posts = await BlogPost.find({
       isPublished: true,
@@ -207,7 +207,7 @@ ${entries}
  * @param {number} limit - Número máximo de posts a incluir
  * @returns {Promise<object>} - JSON Feed
  */
-export const generateJSONFeed = async (baseUrl = 'https://web-scuti.com', limit = 50) => {
+export const generateJSONFeed = async (baseUrl = 'https://www.thadoconsulting.com', limit = 50) => {
   try {
     const posts = await BlogPost.find({
       isPublished: true,
@@ -266,7 +266,7 @@ export const generateJSONFeed = async (baseUrl = 'https://web-scuti.com', limit 
  * @param {number} limit - Número máximo de posts
  * @returns {Promise<string>} - XML del RSS feed
  */
-export const generateCategoryRSSFeed = async (categorySlug, baseUrl = 'https://web-scuti.com', limit = 50) => {
+export const generateCategoryRSSFeed = async (categorySlug, baseUrl = 'https://www.thadoconsulting.com', limit = 50) => {
   try {
     const category = await BlogCategory.findOne({ slug: categorySlug, isActive: true });
     

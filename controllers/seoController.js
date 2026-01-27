@@ -42,7 +42,7 @@ import BlogCategory from '../models/BlogCategory.js';
 import BlogTag from '../models/BlogTag.js';
 
 // URL base del frontend para SEO/Sitemaps
-const FRONTEND_BASE_URL = process.env.SITEMAP_BASE_URL || 'https://thadoconsulting.pe';
+const FRONTEND_BASE_URL = process.env.SITEMAP_BASE_URL || 'https://www.thadoconsulting.com';
 
 /**
  * GET /api/blog/sitemap.xml

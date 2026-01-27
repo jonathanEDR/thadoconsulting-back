@@ -32,7 +32,7 @@ const generateUrlEntry = (loc, lastmod, changefreq = 'weekly', priority = 0.5) =
  * @param {string} baseUrl - URL base del sitio
  * @returns {Promise<string>} - XML del sitemap
  */
-export const generateBlogSitemap = async (baseUrl = 'https://web-scuti.com') => {
+export const generateBlogSitemap = async (baseUrl = 'https://www.thadoconsulting.com') => {
   try {
     const urls = [];
     
@@ -140,7 +140,7 @@ ${sitemapEntries}
  * @param {string} baseUrl - URL base del sitio
  * @returns {Promise<string>} - XML del sitemap de imágenes
  */
-export const generateImageSitemap = async (baseUrl = 'https://web-scuti.com') => {
+export const generateImageSitemap = async (baseUrl = 'https://www.thadoconsulting.com') => {
   try {
     const posts = await BlogPost.find({
       isPublished: true,
@@ -180,7 +180,7 @@ ${urls}
  * @param {number} days - Días hacia atrás (Google News requiere últimas 48h)
  * @returns {Promise<string>} - XML del sitemap de noticias
  */
-export const generateNewsSitemap = async (baseUrl = 'https://web-scuti.com', days = 2) => {
+export const generateNewsSitemap = async (baseUrl = 'https://www.thadoconsulting.com', days = 2) => {
   try {
     const dateLimit = new Date();
     dateLimit.setDate(dateLimit.getDate() - days);
@@ -205,7 +205,7 @@ export const generateNewsSitemap = async (baseUrl = 'https://web-scuti.com', day
     <loc>${baseUrl}/blog/${post.slug}</loc>
     <news:news>
       <news:publication>
-        <news:name>Web Scuti Blog</news:name>
+        <news:name>THADO Consulting Blog</news:name>
         <news:language>es</news:language>
       </news:publication>
       <news:publication_date>${pubDate.toISOString()}</news:publication_date>

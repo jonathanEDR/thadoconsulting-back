@@ -540,13 +540,13 @@ export const createPost = async (req, res) => {
         author: { firstName: user.firstName, lastName: user.lastName }
       };
       
-      const generatedMetaTags = await generatePostMetaTags(tempPost, 'https://thadoconsulting.pe');
-      
+      const generatedMetaTags = await generatePostMetaTags(tempPost, 'https://www.thadoconsulting.com');
+
       finalSeo = {
         metaTitle: seo?.metaTitle || generatedMetaTags.title,
         metaDescription: seo?.metaDescription || generatedMetaTags.description,
         focusKeyphrase: seo?.focusKeyphrase || tags?.[0] || '',
-        canonicalUrl: seo?.canonicalUrl || `https://thadoconsulting.pe/blog/${slug}`,
+        canonicalUrl: seo?.canonicalUrl || `https://www.thadoconsulting.com/blog/${slug}`,
         ogTitle: seo?.ogTitle || generatedMetaTags.openGraph.title,
         ogDescription: seo?.ogDescription || generatedMetaTags.openGraph.description,
         ogImage: seo?.ogImage || featuredImage?.url,
@@ -840,14 +840,14 @@ export const updatePost = async (req, res) => {
         await post.populate('author', 'firstName lastName');
         await post.populate('tags', 'name');
         
-        const generatedMetaTags = await generatePostMetaTags(post.toObject(), 'https://thadoconsulting.pe');
-        
+        const generatedMetaTags = await generatePostMetaTags(post.toObject(), 'https://www.thadoconsulting.com');
+
         post.seo = {
           ...post.seo,
           metaTitle: seo?.metaTitle || post.seo?.metaTitle || generatedMetaTags.title,
           metaDescription: seo?.metaDescription || post.seo?.metaDescription || generatedMetaTags.description,
           focusKeyphrase: seo?.focusKeyphrase || post.seo?.focusKeyphrase || post.tags?.[0]?.name || '',
-          canonicalUrl: seo?.canonicalUrl || post.seo?.canonicalUrl || `https://thadoconsulting.pe/blog/${post.slug}`,
+          canonicalUrl: seo?.canonicalUrl || post.seo?.canonicalUrl || `https://www.thadoconsulting.com/blog/${post.slug}`,
           ogTitle: seo?.ogTitle || post.seo?.ogTitle || generatedMetaTags.openGraph.title,
           ogDescription: seo?.ogDescription || post.seo?.ogDescription || generatedMetaTags.openGraph.description,
           ogImage: seo?.ogImage || post.seo?.ogImage || post.featuredImage?.url,
