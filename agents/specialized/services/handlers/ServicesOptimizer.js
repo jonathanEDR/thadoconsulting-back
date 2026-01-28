@@ -176,14 +176,17 @@ Categoría: ${service.categoria}
 Etiquetas actuales: ${service.etiquetas?.join(', ') || 'ninguna'}
 
 Proporciona:
-1. Título optimizado (max 60 caracteres, incluir keyword principal)
+1. Título SEO optimizado (max 60 caracteres) - FORMATO NATURAL sin pipe (|)
+   - Debe ser una frase completa que combine: servicio + beneficio + valor diferencial
+   - Ejemplos: "Declaración Mensual de Renta e IGV con Cumplimiento Garantizado"
+   - Usa palabras de acción: Profesional, Especializado, Garantizado, Optimizado
 2. Meta descripción optimizada (150-160 caracteres)
 3. 5-8 etiquetas/keywords relevantes
 4. Sugerencias de mejora SEO
 
 Formato JSON:
 {
-  "titulo": "título optimizado",
+  "titulo": "título optimizado sin pipe",
   "metaDescription": "meta descripción",
   "etiquetas": ["tag1", "tag2"],
   "suggestions": ["sugerencia 1", "sugerencia 2"]

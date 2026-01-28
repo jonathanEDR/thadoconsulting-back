@@ -130,7 +130,7 @@ const servicioSchema = new mongoose.Schema(
     },
     tipoPrecio: {
       type: String,
-      enum: ['fijo', 'rango', 'paquetes', 'personalizado', 'suscripcion'],
+      enum: ['fijo', 'desde', 'rango', 'paquetes', 'personalizado', 'consultar', 'suscripcion'],
       default: 'fijo'
     },
     moneda: {

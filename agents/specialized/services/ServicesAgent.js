@@ -778,8 +778,8 @@ Aumenta tus resultados con ${titulo} profesional
       url: slug,
       estado: "Activo",
       seo: {
-        titulo: `${titulo} | ${categoria} Profesional`,
-        descripcion: `${titulo} profesional con garantía de resultados.`
+        titulo: `${titulo} Profesional con Garantía de Resultados`,
+        descripcion: `${titulo} especializado para ${categoria}. Servicio profesional con atención personalizada y resultados garantizados.`
       }
     };
   }

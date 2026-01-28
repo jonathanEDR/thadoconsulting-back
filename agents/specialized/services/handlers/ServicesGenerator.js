@@ -1925,27 +1925,28 @@ Genera únicamente las preguntas con sus respuestas en formato limpio, sin anál
 
 **IMPORTANTE: Responde SOLO con un JSON válido con la siguiente estructura:**
 {
-  "titulo": "Título SEO simple y directo (máximo 40-50 caracteres)",
-  "descripcion": "Meta descripción profesional y concisa (máximo 120-140 caracteres)",
+  "titulo": "Título SEO natural y directo (máximo 55-60 caracteres)",
+  "descripcion": "Meta descripción profesional y concisa (máximo 150-160 caracteres)",
   "palabrasClave": ["palabra1", "palabra2", "palabra3", "palabra4", "palabra5"]
 }
 
-**REQUISITOS PARA TÍTULO SIMPLE:**
-- Formato SIMPLE: "[Servicio] | [Beneficio Principal]"
-- Ejemplos: "Contabilidad | Garantía Resultados", "Marketing | Crecimiento Asegurado"
-- Máximo 45 caracteres (más corto que antes)
-- Directo y comercial, sin palabras complejas
+**REQUISITOS PARA TÍTULO NATURAL (SIN PIPE |):**
+- Formato NATURAL: Frase completa que combine servicio + beneficio + acción
+- Ejemplos: "Declaración Mensual de Renta e IGV con Cumplimiento Garantizado", "Contabilidad Integral para Emprendedores y PYMES", "Asesoría Tributaria Profesional que Maximiza tus Beneficios"
+- Máximo 60 caracteres
+- Usa palabras de acción: "Garantizado", "Profesional", "Especializado", "Optimizado"
+- Directo, claro y orientado a resultados
 
-**REQUISITOS PARA DESCRIPCIÓN SIMPLE:**
-- Una sola oración profesional y directa
-- Incluir servicio + beneficio + garantía
-- Ejemplo: "Servicio profesional con garantía de resultados. Atención personalizada, soporte especializado y procesos optimizados."
-- Máximo 130 caracteres (más corto)
+**REQUISITOS PARA DESCRIPCIÓN SEO:**
+- Dos oraciones profesionales que complementen el título
+- Incluir servicio + beneficio específico + garantía o diferenciador
+- Ejemplo: "Servicio especializado de declaración mensual de renta e IGV para empresas. Cumplimiento tributario garantizado con soporte profesional y asesoría personalizada."
+- Máximo 160 caracteres
 
 **REQUISITOS PARA PALABRAS CLAVE:**
-- 5 palabras clave simples y relevantes
-- Sin frases complejas, solo palabras individuales
-- Ejemplo: ["consultoría", "contabilidad", "servicio", "profesional", "garantía"]
+- 5-7 palabras clave relevantes y específicas
+- Combinar términos generales con específicos
+- Ejemplo: ["declaración mensual", "renta", "IGV", "cumplimiento tributario", "contabilidad", "profesional"]
 
 **Estilo:** Simple, profesional y directo (como la primera foto)
 **ID único:** ${uniqueId}
@@ -2262,7 +2263,7 @@ Genera ÚNICAMENTE el JSON estructurado, sin explicaciones adicionales.`
       // 🆕 Secciones avanzadas (strings/objetos)
       'full_description': '## DESCRIPCIÓN COMPLETA\n[IMPORTANTE: Escribe MÍNIMO 1500-2000 caracteres (400-500 palabras). Descripción EXTENSA y muy detallada que incluya: 1) Introducción atractiva del servicio (200 palabras), 2) Análisis exhaustivo de características principales y beneficios específicos (200 palabras), 3) Descripción completa del proceso de trabajo paso a paso (150 palabras), 4) Ventajas competitivas y diferenciadores únicos (100 palabras), 5) Garantías, certificaciones y respaldos (50 palabras), 6) Llamado a la acción persuasivo y profesional (50 palabras). Texto envolvente, convincente y de alta calidad que demuestre valor excepcional.]',
       'short_description': '## CONTENIDO COMPLEMENTARIO\n[300-500 CARACTERES: Información técnica ESPECÍFICA, garantías concretas, certificaciones, metodología particular, o detalles únicos que complementen la descripción principal. Debe ser diferente y agregar valor específico. Texto directo, técnico y profesional.]',
-      'seo': '## CONTENIDO SEO\n{"titulo": "[Título SIMPLE formato: Servicio | Beneficio - máximo 45 chars]", "descripcion": "[Meta descripción CONCISA - máximo 130 chars]", "palabrasClave": ["palabra1", "palabra2", "palabra3", "palabra4", "palabra5"]}'
+      'seo': '## CONTENIDO SEO\n{"titulo": "[FRASE NATURAL SIN PIPE | - Combina servicio + beneficio + acción en máximo 60 caracteres. Ejemplo: Declaración Mensual de Renta e IGV con Cumplimiento Garantizado]", "descripcion": "[Meta descripción profesional de 150-160 caracteres con servicio, beneficio y diferenciador]", "palabrasClave": ["frase clave 1", "frase clave 2", "frase clave 3", "frase clave 4", "frase clave 5"]}'
     };
 
     const requestedSections = sectionsToGenerate.map(section => sectionTemplates[section]).filter(Boolean);
@@ -2290,8 +2291,8 @@ ${requestedSections.join('\n\n')}
 • **CRÍTICO: LÍMITES DE CARACTERES OBLIGATORIOS:**
   - **DESCRIPCIÓN COMPLETA: MÍNIMO 1500-2000 caracteres (MUY EXTENSO)**
   - CONTENIDO COMPLEMENTARIO: 300-500 caracteres exacto
-  - Título SEO: MÁXIMO 45 caracteres
-  - Descripción SEO: MÁXIMO 130 caracteres
+  - Título SEO: MÁXIMO 60 caracteres (frase natural completa sin pipe |)
+  - Descripción SEO: MÁXIMO 160 caracteres
 • **DIFERENCIACIÓN OBLIGATORIA:**
   - **Descripción Completa (1500+ chars)**: Historia completa del servicio, análisis detallado de beneficios, propuesta de valor extensa, proceso paso a paso, diferenciadores únicos, garantías y llamado a la acción convincente
   - **Contenido Complementario (300-500 chars)**: Solo información técnica específica, certificaciones, metodología o requisitos operativos

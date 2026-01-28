@@ -96,7 +96,7 @@ export const SERVICES_AGENT_CONFIG = {
     supportedCurrencies: ['USD', 'EUR', 'MXN', 'PEN'],
     
     // Tipos de pricing
-    pricingTypes: ['fijo', 'desde', 'rango', 'personalizado', 'consultar']
+    pricingTypes: ['fijo', 'desde', 'rango', 'paquetes', 'personalizado', 'consultar', 'suscripcion']
   },
 
   // ============================================

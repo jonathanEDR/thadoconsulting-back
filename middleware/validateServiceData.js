@@ -23,7 +23,7 @@ const updateServiceSchema = Joi.object({
   precio: Joi.number().min(0).allow(null).optional(),
   precioMin: Joi.number().min(0).allow(null).optional(),
   precioMax: Joi.number().min(0).allow(null).optional(),
-  tipoPrecio: Joi.string().valid('fijo', 'rango', 'paquetes', 'personalizado', 'suscripcion').optional(),
+  tipoPrecio: Joi.string().valid('fijo', 'desde', 'rango', 'paquetes', 'personalizado', 'consultar', 'suscripcion').optional(),
   moneda: Joi.string().valid('USD', 'MXN', 'EUR', 'PEN').optional(),
   
   // Arrays

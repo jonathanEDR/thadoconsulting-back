@@ -29,8 +29,8 @@ function generateHighQualityFallback(service, contentType) {
     'short_description': `${titulo} - Solución profesional en ${categoria} con garantía de resultados. Atención personalizada, procesos optimizados y soporte especializado incluido.`,
     
     'seo': {
-      titulo: `${titulo} | Servicio Profesional ${categoria}`,
-      descripcion: `${titulo} profesional con garantía de resultados en ${categoria}. Procesos optimizados, soporte especializado y atención personalizada.`,
+      titulo: `${titulo} Profesional con Garantía de Resultados`,
+      descripcion: `${titulo} profesional especializado en ${categoria}. Procesos optimizados, soporte especializado y atención personalizada para garantizar resultados.`,
       palabrasClave: [titulo.toLowerCase(), categoria.toLowerCase(), 'profesional', 'calidad', 'resultados']
     },
     
