@@ -24,17 +24,17 @@ const PageSchema = new mongoose.Schema({
         dark: { type: String, default: '' }   // Imagen para tema oscuro
       },
       backgroundImageAlt: { type: String, default: 'Hero background' },
-      // Estilos de texto por tema
+      // Estilos de texto por tema - Con valores por defecto de Thado Consulting
       styles: {
         light: {
-          titleColor: { type: String, default: '' },
-          subtitleColor: { type: String, default: '' },
-          descriptionColor: { type: String, default: '' }
+          titleColor: { type: String, default: '#1F2937' },      // Gris oscuro para título
+          subtitleColor: { type: String, default: '#7528ee' },   // Violeta Thado para subtítulo
+          descriptionColor: { type: String, default: '#7528ee' } // Violeta Thado para descripción
         },
         dark: {
-          titleColor: { type: String, default: '' },
-          subtitleColor: { type: String, default: '' },
-          descriptionColor: { type: String, default: '' }
+          titleColor: { type: String, default: '#FFFFFF' },      // Blanco para título
+          subtitleColor: { type: String, default: '#D1D5DB' },   // Gris claro para subtítulo
+          descriptionColor: { type: String, default: '#9CA3AF' } // Gris medio para descripción
         }
       }
     },
