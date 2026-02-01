@@ -80,6 +80,52 @@ const convertButtonsToFrontend = (buttons) => {
   return converted;
 };
 
+// Helper: Asegurar valores por defecto del tema (para documentos existentes sin valores)
+const ensureThemeDefaults = (theme) => {
+  // Valores por defecto de Thado Consulting
+  const defaultLightMode = {
+    primary: '#2554a3',
+    secondary: '#3462af', 
+    background: '#FFFFFF',
+    text: '#1F2937',
+    textSecondary: '#626871',
+    cardBg: '#F9FAFB',
+    border: '#E5E7EB'
+  };
+  
+  const defaultDarkMode = {
+    primary: '#3462af',
+    secondary: '#5a8fd4',
+    background: '#111827',
+    text: '#FFFFFF',
+    textSecondary: '#D1D5DB',
+    cardBg: '#1F2937',
+    border: '#374151'
+  };
+
+  if (!theme) {
+    theme = { default: 'light', lightMode: {}, darkMode: {} };
+  }
+
+  // Asegurar que lightMode tenga todos los valores
+  if (!theme.lightMode) theme.lightMode = {};
+  for (const [key, value] of Object.entries(defaultLightMode)) {
+    if (!theme.lightMode[key] || theme.lightMode[key] === '') {
+      theme.lightMode[key] = value;
+    }
+  }
+
+  // Asegurar que darkMode tenga todos los valores
+  if (!theme.darkMode) theme.darkMode = {};
+  for (const [key, value] of Object.entries(defaultDarkMode)) {
+    if (!theme.darkMode[key] || theme.darkMode[key] === '') {
+      theme.darkMode[key] = value;
+    }
+  }
+
+  return theme;
+};
+
 // @desc    Obtener todas las páginas
 // @route   GET /api/cms/pages
 // @access  Public (para mostrar en el frontend)
@@ -274,7 +320,10 @@ export const getAllPages = async (req, res) => {
     // Logs de depuración para verificar la corrección
     
     
-          // Convertir botones
+      // Asegurar valores por defecto del tema
+      pageObj.theme = ensureThemeDefaults(pageObj.theme);
+      
+      // Convertir botones
       if (pageObj.theme) {
         if (pageObj.theme.lightMode?.buttons) {
           pageObj.theme.lightMode.buttons = convertButtonsToFrontend(pageObj.theme.lightMode.buttons);
@@ -370,6 +419,9 @@ export const getPageBySlug = async (req, res) => {
         dark: { titleColor: '', descriptionColor: '' }
       };
     }
+    
+    // Asegurar valores por defecto del tema
+    pageObj.theme = ensureThemeDefaults(pageObj.theme);
     
     if (pageObj.theme) {
       if (pageObj.theme.lightMode?.buttons) {
