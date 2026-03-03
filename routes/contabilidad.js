@@ -40,6 +40,16 @@ import {
   generarCronograma
 } from '../controllers/proyeccionesController.js';
 
+// Controllers de Libros Electrónicos
+import {
+  getCatalogoLibros,
+  getLibrosCliente,
+  getLibrosPeriodo,
+  registrarPresentacionLibro,
+  actualizarPresentacionLibro,
+  configurarLibrosCliente
+} from '../controllers/librosElectronicosController.js';
+
 const router = express.Router();
 
 /**
@@ -103,7 +113,17 @@ router.get('/cronograma/:periodo', getCronograma);                              
 router.post('/cronograma/generar', generarCronograma);                          // POST   /api/contabilidad/cronograma/generar
 
 // ========================================
-// 👤 PORTAL CLIENTE (Rutas para rol CLIENT/USER)
+// � LIBROS ELECTRÓNICOS
+// ========================================
+router.get('/libros/catalogo', getCatalogoLibros);                                          // GET    /api/contabilidad/libros/catalogo
+router.get('/libros/cliente/:clienteId', getLibrosCliente);                                 // GET    /api/contabilidad/libros/cliente/:clienteId
+router.get('/libros/cliente/:clienteId/periodo/:periodo', getLibrosPeriodo);                 // GET    /api/contabilidad/libros/cliente/:clienteId/periodo/:periodo
+router.post('/libros', registrarPresentacionLibro);                                         // POST   /api/contabilidad/libros
+router.put('/libros/:id', actualizarPresentacionLibro);                                     // PUT    /api/contabilidad/libros/:id
+router.put('/libros/cliente/:clienteId/configurar', configurarLibrosCliente);                // PUT    /api/contabilidad/libros/cliente/:clienteId/configurar
+
+// ========================================
+// �👤 PORTAL CLIENTE (Rutas para rol CLIENT/USER)
 // ========================================
 router.get('/mi-cuenta', getMiCuentaContable);                                  // GET    /api/contabilidad/mi-cuenta
 router.get('/mis-declaraciones', getMisDeclaraciones);                          // GET    /api/contabilidad/mis-declaraciones

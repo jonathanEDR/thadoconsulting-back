@@ -273,7 +273,12 @@ const clienteContableSchema = new mongoose.Schema(
         renta: { type: Boolean, default: true },
         planilla: { type: Boolean, default: false },
         librosElectronicos: { type: Boolean, default: false }
-      }
+      },
+      // Libros electrónicos que el cliente debe llevar (códigos del catálogo)
+      librosElectronicos: [{
+        type: String,
+        trim: true
+      }]
     },
     
     // ========================================
