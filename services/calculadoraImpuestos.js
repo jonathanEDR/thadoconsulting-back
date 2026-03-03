@@ -231,6 +231,7 @@ export const calcularRenta = (regimen, params = {}) => {
  * @param {number} params.saldoFavorAnterior - Saldo a favor anterior
  * @param {number|null} params.coeficiente - Coeficiente de renta
  * @param {number|null} params.categoriaRUS - Categoría RUS
+ * @param {string} params.zonaIGV - Zona IGV: 'GRAVADA', 'EXONERADA' o 'INAFECTA'
  * @returns {Object} Resultado completo del cálculo
  */
 export const calcularDeclaracionCompleta = (params) => {
@@ -240,13 +241,34 @@ export const calcularDeclaracionCompleta = (params) => {
     creditoFiscal = 0,
     saldoFavorAnterior = 0,
     coeficiente = null,
-    categoriaRUS = null
+    categoriaRUS = null,
+    zonaIGV = 'GRAVADA'
   } = params;
   
   // En RUS no se declara IGV separado (todo es cuota fija)
+  // En zona EXONERADA o INAFECTA, IGV = 0
   let detalleIGV = null;
+  const esExoneradoIGV = zonaIGV === 'EXONERADA' || zonaIGV === 'INAFECTA';
+  
   if (regimen !== 'RUS') {
-    detalleIGV = calcularIGV(ventasGravadas, creditoFiscal, saldoFavorAnterior);
+    if (esExoneradoIGV) {
+      // Zona exonerada/inafecta: IGV es 0, no se cobra ni se paga
+      detalleIGV = {
+        ventasGravadas,
+        debitoFiscal: 0,
+        creditoFiscal: 0,
+        igvResultante: 0,
+        saldoFavorAnterior: 0,
+        igvAPagar: 0,
+        saldoFavorSiguiente: 0,
+        zonaIGV,
+        nota: zonaIGV === 'EXONERADA' 
+          ? '📍 Zona exonerada de IGV (Ley 27037 - Amazonía)' 
+          : '📍 Zona inafecta de IGV'
+      };
+    } else {
+      detalleIGV = calcularIGV(ventasGravadas, creditoFiscal, saldoFavorAnterior);
+    }
   }
   
   // Calcular renta según régimen
@@ -263,12 +285,14 @@ export const calcularDeclaracionCompleta = (params) => {
   
   return {
     regimen,
+    zonaIGV,
     detalleIGV,
     detalleRenta,
     resumen: {
       igvAPagar,
       rentaAPagar,
-      totalAPagar
+      totalAPagar,
+      esExoneradoIGV
     }
   };
 };

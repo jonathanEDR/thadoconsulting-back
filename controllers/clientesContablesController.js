@@ -174,13 +174,16 @@ export const crearCliente = async (req, res) => {
       razonSocial,
       nombreComercial,
       regimenTributario,
+      zonaIGV,
       direccionFiscal,
+      ubicacion,
       representante,
       contacto,
       honorarioMensual,
       moneda,
       linkDrive,
       configuracionTributaria,
+      contadorAsignado: contadorBody,
       fechaInicioServicios,
       tags
     } = req.body;
@@ -199,7 +202,9 @@ export const crearCliente = async (req, res) => {
       razonSocial,
       nombreComercial,
       regimenTributario,
+      zonaIGV: zonaIGV || 'GRAVADA',
       direccionFiscal,
+      ubicacion,
       representante,
       contacto,
       honorarioMensual,
@@ -208,7 +213,7 @@ export const crearCliente = async (req, res) => {
       configuracionTributaria,
       fechaInicioServicios,
       tags,
-      contadorAsignado: {
+      contadorAsignado: contadorBody?.nombre ? contadorBody : {
         userId: clerkId,
         nombre: `${firstName || ''} ${lastName || ''}`.trim(),
         email
@@ -287,9 +292,11 @@ export const actualizarCliente = async (req, res) => {
     // Campos actualizables
     const camposPermitidos = [
       'razonSocial', 'nombreComercial', 'regimenTributario',
-      'direccionFiscal', 'representante', 'contacto',
+      'zonaIGV', 'direccionFiscal', 'ubicacion',
+      'representante', 'contacto',
       'honorarioMensual', 'moneda', 'linkDrive',
-      'configuracionTributaria', 'tags', 'fechaInicioServicios'
+      'configuracionTributaria', 'contadorAsignado',
+      'tags', 'fechaInicioServicios'
     ];
     
     camposPermitidos.forEach(campo => {
@@ -506,6 +513,7 @@ export const vincularUsuario = async (req, res) => {
       userId: usuario._id,
       clerkId: usuario.clerkId,
       email: usuario.email,
+      nombre: `${usuario.firstName || ''} ${usuario.lastName || ''}`.trim() || usuario.email,
       vinculadoEn: new Date(),
       vinculadoPor: {
         userId: adminClerkId,
@@ -589,7 +597,97 @@ export const desvincularUsuario = async (req, res) => {
 };
 
 // ========================================
-// 🚨 SEMÁFORO DE VENCIMIENTOS
+// � BUSCAR USUARIOS DISPONIBLES PARA VINCULAR
+// ========================================
+
+/**
+ * @desc    Obtener lista de usuarios del sistema disponibles para vincular
+ * @route   GET /api/contabilidad/clientes/usuarios-disponibles
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const getUsuariosDisponibles = async (req, res) => {
+  try {
+    const { role } = req.user;
+    const { search = '', page = 1, limit = 20 } = req.query;
+
+    if (!hasPermission(role, PERMISSIONS.MANAGE_ACCOUNTING_CLIENTS)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para gestionar clientes'
+      });
+    }
+
+    // Obtener IDs de usuarios ya vinculados a clientes activos
+    const clientesConUsuario = await ClienteContable.find(
+      { 'usuarioVinculado.userId': { $ne: null }, activo: true },
+      { 'usuarioVinculado.userId': 1 }
+    ).lean();
+
+    const idsYaVinculados = clientesConUsuario
+      .map(c => c.usuarioVinculado?.userId)
+      .filter(Boolean);
+
+    // Construir filtro de búsqueda
+    const filters = {
+      _id: { $nin: idsYaVinculados },
+      isActive: true
+    };
+
+    if (search) {
+      filters.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [usuarios, total] = await Promise.all([
+      User.find(filters)
+        .select('_id clerkId email firstName lastName username profileImage role')
+        .sort({ firstName: 1, lastName: 1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      User.countDocuments(filters)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        usuarios: usuarios.map(u => ({
+          _id: u._id,
+          clerkId: u.clerkId,
+          email: u.email,
+          nombre: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.username || u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          profileImage: u.profileImage,
+          role: u.role
+        })),
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / parseInt(limit)),
+          total,
+          hasNext: parseInt(page) < Math.ceil(total / parseInt(limit))
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error obteniendo usuarios disponibles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener usuarios disponibles',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// ========================================
+// �🚨 SEMÁFORO DE VENCIMIENTOS
 // ========================================
 
 /**
@@ -663,7 +761,60 @@ export const getEstadisticas = async (req, res) => {
 };
 
 // ========================================
-// 👤 PORTAL CLIENTE: Mi Cuenta Contable
+// �️ MAPA DE CLIENTES
+// ========================================
+
+/**
+ * @desc    Obtener clientes con ubicación para visualización en mapa
+ * @route   GET /api/contabilidad/clientes/mapa
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const getClientesMapa = async (req, res) => {
+  try {
+    const { role } = req.user;
+
+    if (!hasPermission(role, PERMISSIONS.VIEW_ACCOUNTING_CLIENTS)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para ver el mapa de clientes'
+      });
+    }
+
+    const clientes = await ClienteContable.find(
+      { activo: true },
+      {
+        ruc: 1,
+        razonSocial: 1,
+        nombreComercial: 1,
+        regimenTributario: 1,
+        estado: 1,
+        zonaIGV: 1,
+        ubicacion: 1,
+        direccionFiscal: 1,
+        'contacto.email': 1,
+        'contacto.telefono': 1,
+        honorarioMensual: 1
+      }
+    ).lean();
+
+    res.json({
+      success: true,
+      data: clientes,
+      total: clientes.length
+    });
+
+  } catch (error) {
+    logger.error('Error obteniendo clientes para mapa:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener datos del mapa',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// ========================================
+// �👤 PORTAL CLIENTE: Mi Cuenta Contable
 // ========================================
 
 /**

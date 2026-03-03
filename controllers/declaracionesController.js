@@ -98,7 +98,8 @@ export const registrarDeclaracion = async (req, res) => {
       creditoFiscal: creditoFiscal || 0,
       saldoFavorAnterior: saldoFavorAnterior || 0,
       coeficiente: coeficiente || cliente.configuracionTributaria?.coeficienteRenta,
-      categoriaRUS: categoriaRUS || cliente.configuracionTributaria?.categoriaRUS
+      categoriaRUS: categoriaRUS || cliente.configuracionTributaria?.categoriaRUS,
+      zonaIGV: cliente.zonaIGV || 'GRAVADA'
     });
     
     // Construir detalle IGV
@@ -133,6 +134,8 @@ export const registrarDeclaracion = async (req, res) => {
     const nuevaDeclaracion = new DeclaracionMensual({
       clienteId,
       periodo,
+      anio: parseInt(periodo.split('-')[0]),
+      mes: parseInt(periodo.split('-')[1]),
       detalleIGV,
       detalleRenta: calculo.detalleRenta,
       totalAPagar: calculo.resumen.totalAPagar,
@@ -212,6 +215,7 @@ export const calcularImpuestosPreview = async (req, res) => {
     let regimenCalculo = regimen;
     let coeficienteCalculo = coeficiente;
     let categoriaCalculo = categoriaRUS;
+    let zonaIGVCalculo = 'GRAVADA';
     
     // Si se pasa clienteId, obtener régimen del cliente
     if (clienteId) {
@@ -220,6 +224,7 @@ export const calcularImpuestosPreview = async (req, res) => {
         regimenCalculo = cliente.regimenTributario;
         coeficienteCalculo = coeficiente || cliente.configuracionTributaria?.coeficienteRenta;
         categoriaCalculo = categoriaRUS || cliente.configuracionTributaria?.categoriaRUS;
+        zonaIGVCalculo = cliente.zonaIGV || 'GRAVADA';
       }
     }
     
@@ -236,7 +241,8 @@ export const calcularImpuestosPreview = async (req, res) => {
       creditoFiscal: creditoFiscal || 0,
       saldoFavorAnterior: saldoFavorAnterior || 0,
       coeficiente: coeficienteCalculo,
-      categoriaRUS: categoriaCalculo
+      categoriaRUS: categoriaCalculo,
+      zonaIGV: zonaIGVCalculo
     });
     
     res.json({
@@ -421,9 +427,43 @@ export const actualizarDeclaracion = async (req, res) => {
       estado,
       fechaPresentacion,
       numeroOrden,
-      observaciones
+      observaciones,
+      // Recalculation fields (optional)
+      ventasGravadas,
+      creditoFiscal,
+      saldoFavorAnterior,
+      coeficiente
     } = req.body;
     
+    // If calculation fields provided, recalculate amounts
+    if (ventasGravadas !== undefined || creditoFiscal !== undefined) {
+      const cliente = await ClienteContable.findById(declaracion.clienteId);
+      if (cliente) {
+        const calculo = calcularDeclaracionCompleta({
+          regimen: cliente.regimenTributario,
+          ventasGravadas: ventasGravadas ?? 0,
+          creditoFiscal: creditoFiscal ?? 0,
+          saldoFavorAnterior: saldoFavorAnterior ?? 0,
+          coeficiente: coeficiente || cliente.configuracionTributaria?.coeficienteRenta,
+          categoriaRUS: cliente.configuracionTributaria?.categoriaRUS,
+          zonaIGV: cliente.zonaIGV || 'GRAVADA'
+        });
+        if (calculo.detalleIGV) {
+          declaracion.detalleIGV = {
+            ventasGravadas: ventasGravadas ?? 0,
+            debitoFiscal: calculo.detalleIGV.debitoFiscal,
+            creditoFiscal: calculo.detalleIGV.creditoFiscal,
+            igvResultante: calculo.detalleIGV.igvResultante,
+            saldoFavorAnterior: calculo.detalleIGV.saldoFavorAnterior,
+            igvAPagar: calculo.detalleIGV.igvAPagar,
+            saldoFavorSiguiente: calculo.detalleIGV.saldoFavorSiguiente
+          };
+        }
+        declaracion.detalleRenta = calculo.detalleRenta;
+        declaracion.totalAPagar = calculo.resumen.totalAPagar;
+      }
+    }
+
     // Actualizar campos permitidos
     if (pago) declaracion.pago = { ...declaracion.pago.toObject?.() || declaracion.pago, ...pago };
     if (estado) declaracion.estado = estado;
@@ -554,7 +594,7 @@ export const getMisDeclaraciones = async (req, res) => {
     
     const [declaraciones, total] = await Promise.all([
       DeclaracionMensual.find(filter)
-        .select('periodo estado totalAPagar fechaPresentacion fechaVencimiento detalleIGV.igvAPagar detalleRenta.rentaAPagar detalleRenta.regimenAplicado pago.montoPagado')
+        .select('periodo anio mes estado totalAPagar fechaPresentacion fechaVencimiento detalleIGV.igvAPagar detalleRenta.rentaAPagar detalleRenta.regimenAplicado pago.montoPagado')
         .sort({ periodo: -1 })
         .skip(skip)
         .limit(parseInt(limit))

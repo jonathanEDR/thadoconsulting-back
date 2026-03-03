@@ -170,22 +170,35 @@ export const obtenerSemaforoVencimientos = async () => {
 
 /**
  * Obtener estadísticas generales del módulo contable
+ * Retorna campos que coinciden con EstadisticasContabilidad del frontend
  * @returns {Object} Estadísticas generales
  */
 export const obtenerEstadisticasGenerales = async () => {
   try {
     const [
       totalClientes,
-      clientesPorRegimen,
+      clientesActivos,
+      clientesSuspendidos,
+      clientesBaja,
+      porRegimen,
       declaracionesMes,
+      declaracionesPendientes,
       totalHonorarios
     ] = await Promise.all([
+      ClienteContable.countDocuments({ activo: true }),
       ClienteContable.countDocuments({ activo: true, estado: 'activo' }),
+      ClienteContable.countDocuments({ activo: true, estado: 'suspendido' }),
+      ClienteContable.countDocuments({ estado: 'baja' }),
       ClienteContable.contarPorRegimen(),
       DeclaracionMensual.countDocuments({ 
         periodo: getPeriodoActual(), 
         activo: true,
         estado: { $in: ['PRESENTADO', 'PAGADO'] }
+      }),
+      DeclaracionMensual.countDocuments({
+        periodo: getPeriodoActual(),
+        activo: true,
+        estado: { $nin: ['PRESENTADO', 'PAGADO'] }
       }),
       ClienteContable.aggregate([
         { $match: { activo: true, estado: 'activo' } },
@@ -195,10 +208,13 @@ export const obtenerEstadisticasGenerales = async () => {
     
     return {
       totalClientes,
-      clientesPorRegimen,
-      declaracionesPresentadasMes: declaracionesMes,
-      periodoActual: getPeriodoActual(),
-      ingresosMensualesEstimados: totalHonorarios[0]?.total || 0
+      clientesActivos,
+      clientesSuspendidos,
+      clientesBaja,
+      porRegimen,
+      declaracionesMes,
+      declaracionesPendientes,
+      montoTotalMes: totalHonorarios[0]?.total || 0
     };
   } catch (error) {
     logger.error('Error obteniendo estadísticas generales:', error);

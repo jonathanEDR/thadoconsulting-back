@@ -11,8 +11,10 @@ import {
   reactivarCliente,
   vincularUsuario,
   desvincularUsuario,
+  getUsuariosDisponibles,
   getSemaforoVencimientos,
   getEstadisticas,
+  getClientesMapa,
   getMiCuentaContable
 } from '../controllers/clientesContablesController.js';
 
@@ -57,6 +59,11 @@ router.get('/alertas/semaforo', getSemaforoVencimientos);         // GET /api/co
 // ========================================
 // 🏢 CRUD DE CLIENTES CONTABLES
 // ========================================
+
+// ⚠️ Rutas específicas ANTES de rutas con :id para evitar que Express las confunda
+router.get('/clientes/mapa', getClientesMapa);                                 // GET    /api/contabilidad/clientes/mapa
+router.get('/clientes/usuarios-disponibles', getUsuariosDisponibles);           // GET    /api/contabilidad/clientes/usuarios-disponibles
+
 router.route('/clientes')
   .get(listarClientes)      // GET    /api/contabilidad/clientes
   .post(crearCliente);      // POST   /api/contabilidad/clientes

@@ -99,14 +99,36 @@ const clienteContableSchema = new mongoose.Schema(
       },
       required: [true, 'El régimen tributario es requerido']
     },
+
+    // ========================================
+    // 🗺️ ZONA IGV
+    // ========================================
+    zonaIGV: {
+      type: String,
+      enum: {
+        values: ['GRAVADA', 'EXONERADA', 'INAFECTA'],
+        message: 'Zona IGV inválida. Opciones: GRAVADA, EXONERADA, INAFECTA'
+      },
+      default: 'GRAVADA'
+    },
     
     // ========================================
-    // 🏠 DIRECCIÓN FISCAL
+    // 🏠 DIRECCIÓN FISCAL Y UBICACIÓN
     // ========================================
     direccionFiscal: {
       type: String,
       trim: true,
       default: ''
+    },
+    ubicacion: {
+      direccion: { type: String, trim: true, default: '' },
+      distrito: { type: String, trim: true, default: '' },
+      provincia: { type: String, trim: true, default: '' },
+      departamento: { type: String, trim: true, default: '' },
+      coordenadas: {
+        lat: { type: Number, default: null },
+        lng: { type: Number, default: null }
+      }
     },
     
     // ========================================
@@ -199,6 +221,10 @@ const clienteContableSchema = new mongoose.Schema(
         index: true
       },
       email: {
+        type: String,
+        default: null
+      },
+      nombre: {
         type: String,
         default: null
       },
@@ -322,6 +348,7 @@ clienteContableSchema.index({ razonSocial: 'text', ruc: 'text', 'representante.n
 clienteContableSchema.index({ estado: 1, activo: 1 });
 clienteContableSchema.index({ regimenTributario: 1, activo: 1 });
 clienteContableSchema.index({ 'contadorAsignado.userId': 1, activo: 1 });
+clienteContableSchema.index({ zonaIGV: 1, activo: 1 });
 
 // ========================================
 // 🔧 VIRTUALS
