@@ -31,6 +31,7 @@ import agentAgendaRoutes from './routes/agentAgenda.js';
 import seoMonitorRoutes from './routes/seo-monitor.js';
 import agentsBlogSessionRoutes from './routes/agents-blog-session.js';
 import directMessagesRoutes from './routes/directMessages.js';
+import contabilidadRoutes from './routes/contabilidad.js';
 import notificationsRoutes from './routes/notifications.js';
 import { cmsLogger } from './middleware/logger.js';
 import { 
@@ -499,6 +500,7 @@ app.use('/api/user-blog', generalLimiter, userBlogRoutes); // 📚 User Blog Act
 app.use('/api/events', generalLimiter, eventRoutes); // 📅 Events/Agenda System Routes
 app.use('/api/seo-monitor', generalLimiter, seoMonitorRoutes); // 📊 SEO Monitoring System
 app.use('/api/direct-messages', generalLimiter, directMessagesRoutes); // 📧 Direct Messages to Users
+app.use('/api/contabilidad', generalLimiter, contabilidadRoutes); // 🏢 Módulo Contabilidad (Gestión Clientes Contables)
 
 // Manejo de rutas no encontradas
 app.use((req, res) => {

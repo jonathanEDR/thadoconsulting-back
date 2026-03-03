@@ -184,7 +184,22 @@ export const PERMISSIONS = {
   
   // Eventos - Analytics
   VIEW_EVENT_ANALYTICS: 'VIEW_EVENT_ANALYTICS',       // Ver estadísticas de eventos
-  EXPORT_EVENT_DATA: 'EXPORT_EVENT_DATA'              // Exportar datos de eventos
+  EXPORT_EVENT_DATA: 'EXPORT_EVENT_DATA',              // Exportar datos de eventos
+  
+  // ========================================
+  // 🏢 PERMISOS DE CONTABILIDAD
+  // ========================================
+  
+  // Clientes Contables
+  VIEW_ACCOUNTING_CLIENTS: 'VIEW_ACCOUNTING_CLIENTS',             // Ver lista de clientes contables
+  MANAGE_ACCOUNTING_CLIENTS: 'MANAGE_ACCOUNTING_CLIENTS',         // CRUD completo de clientes contables
+  
+  // Declaraciones
+  VIEW_ACCOUNTING_DECLARATIONS: 'VIEW_ACCOUNTING_DECLARATIONS',   // Ver declaraciones
+  MANAGE_ACCOUNTING_DECLARATIONS: 'MANAGE_ACCOUNTING_DECLARATIONS', // Registrar/editar declaraciones
+  
+  // Portal Cliente - Contabilidad
+  VIEW_OWN_ACCOUNTING: 'VIEW_OWN_ACCOUNTING'                      // Ver sus propias declaraciones (rol CLIENT)
 };
 
 // Matriz de permisos por rol
@@ -278,7 +293,12 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.RESPOND_TO_EVENTS,
     PERMISSIONS.MANAGE_EVENT_REMINDERS,
     PERMISSIONS.VIEW_EVENT_ANALYTICS,
-    PERMISSIONS.EXPORT_EVENT_DATA
+    PERMISSIONS.EXPORT_EVENT_DATA,
+    // Contabilidad - Acceso total
+    PERMISSIONS.VIEW_ACCOUNTING_CLIENTS,
+    PERMISSIONS.MANAGE_ACCOUNTING_CLIENTS,
+    PERMISSIONS.VIEW_ACCOUNTING_DECLARATIONS,
+    PERMISSIONS.MANAGE_ACCOUNTING_DECLARATIONS
   ],
   
   [ROLES.ADMIN]: [
@@ -367,7 +387,12 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.RESPOND_TO_EVENTS,
     PERMISSIONS.MANAGE_EVENT_REMINDERS,
     PERMISSIONS.VIEW_EVENT_ANALYTICS,
-    PERMISSIONS.EXPORT_EVENT_DATA
+    PERMISSIONS.EXPORT_EVENT_DATA,
+    // Contabilidad - Gestión completa
+    PERMISSIONS.VIEW_ACCOUNTING_CLIENTS,
+    PERMISSIONS.MANAGE_ACCOUNTING_CLIENTS,
+    PERMISSIONS.VIEW_ACCOUNTING_DECLARATIONS,
+    PERMISSIONS.MANAGE_ACCOUNTING_DECLARATIONS
   ],
   
   [ROLES.MODERATOR]: [
@@ -431,7 +456,9 @@ export const ROLE_PERMISSIONS = {
     // Blog - Solo lectura
     PERMISSIONS.VIEW_PUBLISHED_POSTS,
     PERMISSIONS.VIEW_BLOG_CATEGORIES,
-    PERMISSIONS.VIEW_BLOG_TAGS
+    PERMISSIONS.VIEW_BLOG_TAGS,
+    // Contabilidad - Portal cliente (solo sus propias declaraciones)
+    PERMISSIONS.VIEW_OWN_ACCOUNTING
     // Eventos/Agenda - NO TIENE ACCESO (Solo área administrativa)
   ],
   
