@@ -1,5 +1,53 @@
 import mongoose from 'mongoose';
 
+// ========================================
+// 📋 TIPOS DE DECLARACIÓN
+// ========================================
+export const TIPOS_DECLARACION = ['IGV_RENTA', 'PLANILLA', 'AFP'];
+
+// ========================================
+// 📊 AFP Providers en Perú
+// ========================================
+export const AFP_PROVIDERS = {
+  HABITAT: {
+    nombre: 'AFP Habitat',
+    comision: 0.0138,
+    primaSeguro: 0.0186
+  },
+  INTEGRA: {
+    nombre: 'AFP Integra',
+    comision: 0.0155,
+    primaSeguro: 0.0186
+  },
+  PRIMA: {
+    nombre: 'AFP Prima',
+    comision: 0.0155,
+    primaSeguro: 0.0186
+  },
+  PROFUTURO: {
+    nombre: 'AFP Profuturo',
+    comision: 0.0169,
+    primaSeguro: 0.0186
+  }
+};
+
+// ========================================
+// 📊 Constantes laborales Perú
+// ========================================
+export const CONSTANTES_LABORALES = {
+  ESSALUD_TASA: 0.09,         // 9% a cargo del empleador
+  ONP_TASA: 0.13,             // 13% a cargo del trabajador
+  AFP_APORTE_OBLIGATORIO: 0.10, // 10% aporte obligatorio
+  RENTA_5TA_TRAMOS: [
+    { hasta: 7, tasa: 0.08 },
+    { hasta: 12, tasa: 0.14 },
+    { hasta: 27, tasa: 0.17 },
+    { hasta: 42, tasa: 0.20 },
+    { hasta: Infinity, tasa: 0.30 }
+  ],
+  UIT_2026: 5350 // Valor UIT 2026
+};
+
 /**
  * 📊 Schema de Detalle IGV
  * Desglose del cálculo de IGV mensual
@@ -104,7 +152,138 @@ const detalleRentaSchema = new mongoose.Schema({
 }, { _id: false });
 
 /**
- * 📄 Schema Principal de Declaración Mensual
+ * � Schema de Detalle Planilla (PLAME - PDT 601)
+ * Declaración mensual de planillas electrónicas
+ */
+const detallePlanillaSchema = new mongoose.Schema({
+  cantidadTrabajadores: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  totalRemuneraciones: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // ESSALUD: monto manual ingresado por el contador (a cargo del empleador)
+  essalud: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // SIS: monto manual (alternativa a ESSALUD para empresas MYPE/microempresa)
+  sis: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // ONP: 13% sobre remuneraciones (a cargo del trabajador, retenido por empleador)
+  onp: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  cantidadTrabajadoresONP: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  totalRemuneracionesONP: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Trabajadores AFP dentro de la planilla (para ESSALUD y referencia PLAME)
+  cantidadTrabajadoresAFP: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  totalRemuneracionesAFP: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Retenciones de Impuesto a la Renta de 5ta Categoría
+  retenciones5ta: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  cantidadTrabajadores5ta: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Vida Ley / SCTR (si aplica)
+  vidaLey: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Total a pagar por planilla = ESSALUD + SIS + ONP + Retenciones 5ta + Vida Ley
+  totalAPagar: {
+    type: Number,
+    min: 0,
+    default: 0
+  }
+}, { _id: false });
+
+/**
+ * 🏦 Schema de Detalle AFP (AFPnet)
+ * Declaración mensual de aportes a AFP
+ */
+const detalleAFPSchema = new mongoose.Schema({
+  afpNombre: {
+    type: String,
+    enum: ['HABITAT', 'INTEGRA', 'PRIMA', 'PROFUTURO', ''],
+    default: ''
+  },
+  cantidadAfiliados: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  totalRemuneraciones: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Aporte obligatorio: 10% de la remuneración
+  aporteObligatorio: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Comisión AFP (varía por AFP)
+  comisionAFP: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Prima de seguro (~1.86%)
+  primaSeguro: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Aporte voluntario (opcional)
+  aporteVoluntario: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Total a pagar = aporteObligatorio + comisionAFP + primaSeguro + aporteVoluntario
+  totalAPagar: {
+    type: Number,
+    min: 0,
+    default: 0
+  }
+}, { _id: false });
+
+/**
+ * �📄 Schema Principal de Declaración Mensual
  * Registra cada declaración tributaria presentada por un cliente
  */
 const declaracionMensualSchema = new mongoose.Schema(
@@ -120,7 +299,21 @@ const declaracionMensualSchema = new mongoose.Schema(
     },
     
     // ========================================
-    // 📅 PERIODO
+    // � TIPO DE DECLARACIÓN
+    // ========================================
+    tipo: {
+      type: String,
+      enum: {
+        values: TIPOS_DECLARACION,
+        message: 'Tipo de declaración inválido'
+      },
+      default: 'IGV_RENTA',
+      required: true,
+      index: true
+    },
+    
+    // ========================================
+    // �📅 PERIODO
     // ========================================
     periodo: {
       type: String,
@@ -149,7 +342,17 @@ const declaracionMensualSchema = new mongoose.Schema(
     },
     detalleRenta: {
       type: detalleRentaSchema,
-      required: true
+      default: null
+    },
+    
+    detallePlanilla: {
+      type: detallePlanillaSchema,
+      default: null
+    },
+    
+    detalleAFP: {
+      type: detalleAFPSchema,
+      default: null
     },
     
     // ========================================
@@ -165,7 +368,7 @@ const declaracionMensualSchema = new mongoose.Schema(
     // ========================================
     formulario: {
       type: String,
-      enum: ['PDT621', 'PDT621_SIMPLIFICADO', 'FORMULARIO_VIRTUAL', 'NRUS'],
+      enum: ['PDT621', 'PDT621_SIMPLIFICADO', 'FORMULARIO_VIRTUAL', 'NRUS', 'PLAME', 'AFPNET'],
       default: 'PDT621'
     },
     numeroOrden: {
@@ -287,10 +490,11 @@ const declaracionMensualSchema = new mongoose.Schema(
 // ========================================
 // 🔍 ÍNDICES COMPUESTOS
 // ========================================
-declaracionMensualSchema.index({ clienteId: 1, periodo: 1 }, { unique: true });
+declaracionMensualSchema.index({ clienteId: 1, periodo: 1, tipo: 1 }, { unique: true });
 declaracionMensualSchema.index({ periodo: 1, estado: 1, activo: 1 });
 declaracionMensualSchema.index({ fechaVencimiento: 1, estado: 1 });
 declaracionMensualSchema.index({ anio: 1, clienteId: 1, activo: 1 });
+declaracionMensualSchema.index({ tipo: 1, anio: 1, clienteId: 1 });
 
 // ========================================
 // 🔧 VIRTUALS
@@ -330,10 +534,17 @@ declaracionMensualSchema.pre('save', function(next) {
     this.mes = mes;
   }
   
-  // Calcular total a pagar
-  const igv = this.detalleIGV?.igvAPagar || 0;
-  const renta = this.detalleRenta?.rentaAPagar || 0;
-  this.totalAPagar = igv + renta;
+  // Calcular total a pagar según tipo de declaración
+  if (this.tipo === 'PLANILLA') {
+    this.totalAPagar = this.detallePlanilla?.totalAPagar || 0;
+  } else if (this.tipo === 'AFP') {
+    this.totalAPagar = this.detalleAFP?.totalAPagar || 0;
+  } else {
+    // IGV_RENTA
+    const igv = this.detalleIGV?.igvAPagar || 0;
+    const renta = this.detalleRenta?.rentaAPagar || 0;
+    this.totalAPagar = igv + renta;
+  }
   
   // Auto-detectar estado vencido
   if (this.estado === 'PENDIENTE' && this.fechaVencimiento && new Date() > this.fechaVencimiento) {
@@ -348,9 +559,10 @@ declaracionMensualSchema.pre('save', function(next) {
 // ========================================
 
 // Obtener historial de un cliente
-declaracionMensualSchema.statics.getHistorialCliente = function(clienteId, anio = null) {
+declaracionMensualSchema.statics.getHistorialCliente = function(clienteId, anio = null, tipo = null) {
   const filter = { clienteId, activo: true };
   if (anio) filter.anio = anio;
+  if (tipo) filter.tipo = tipo;
   return this.find(filter).sort({ periodo: -1 }).lean();
 };
 
@@ -369,6 +581,8 @@ declaracionMensualSchema.statics.getResumenAnual = function(clienteId, anio) {
         _id: '$clienteId',
         totalIGV: { $sum: '$detalleIGV.igvAPagar' },
         totalRenta: { $sum: '$detalleRenta.rentaAPagar' },
+        totalPlanilla: { $sum: '$detallePlanilla.totalAPagar' },
+        totalAFP: { $sum: '$detalleAFP.totalAPagar' },
         totalPagado: { $sum: '$pago.montoPagado' },
         totalAPagar: { $sum: '$totalAPagar' },
         declaracionesPresentadas: { 

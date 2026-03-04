@@ -298,6 +298,27 @@ export const calcularDeclaracionCompleta = (params) => {
 };
 
 // ========================================
+// 📊 CONSTANTES LABORALES
+// ========================================
+
+// ESSALUD: 9% a cargo del empleador
+const TASA_ESSALUD = 0.09;
+
+// ONP: 13% a cargo del trabajador (retenido por empleador)
+const TASA_ONP = 0.13;
+
+// AFP: Aporte obligatorio 10%
+const TASA_AFP_APORTE = 0.10;
+
+// AFP Comisiones y Prima de Seguro (vigentes 2026)
+const AFP_TASAS = {
+  HABITAT:   { comision: 0.0138, primaSeguro: 0.0186 },
+  INTEGRA:   { comision: 0.0155, primaSeguro: 0.0186 },
+  PRIMA:     { comision: 0.0155, primaSeguro: 0.0186 },
+  PROFUTURO: { comision: 0.0169, primaSeguro: 0.0186 }
+};
+
+// ========================================
 // 📊 CONSTANTES EXPORTADAS
 // ========================================
 export const CONSTANTES_TRIBUTARIAS = {
@@ -313,7 +334,130 @@ export const CONSTANTES_TRIBUTARIAS = {
     RER: 'Régimen Especial de Renta (RER)',
     MYPE: 'Régimen MYPE Tributario (RMT)',
     GENERAL: 'Régimen General (RG)'
-  }
+  },
+  TASA_ESSALUD,
+  TASA_ONP,
+  TASA_AFP_APORTE,
+  AFP_TASAS
+};
+
+// ========================================
+// 👥 CÁLCULO DE PLANILLA (PLAME)
+// ========================================
+
+/**
+ * Calcular declaración de Planilla (PDT 601 - PLAME)
+ * @param {Object} params
+ * @param {number} params.cantidadTrabajadores - Nº total de trabajadores
+ * @param {number} params.totalRemuneraciones - Suma bruta de sueldos
+ * @param {number} params.cantidadTrabajadoresONP - Nº de trabajadores en ONP
+ * @param {number} params.totalRemuneracionesONP - Remuneraciones de trabajadores ONP
+ * @param {number} params.retenciones5ta - Retenciones IR 5ta categoría (ya calculadas)
+ * @param {number} params.cantidadTrabajadores5ta - Nº trabajadores con retención 5ta
+ * @param {number} params.vidaLey - Monto Vida Ley/SCTR (si aplica)
+ * @returns {Object} Detalle del cálculo de planilla
+ */
+export const calcularPlanilla = (params = {}) => {
+  const {
+    cantidadTrabajadores = 0,
+    totalRemuneraciones = 0,
+    cantidadTrabajadoresONP = 0,
+    totalRemuneracionesONP = 0,
+    cantidadTrabajadoresAFP = 0,   // Trabajadores AFP dentro de PLAME
+    totalRemuneracionesAFP = 0,    // Sus remuneraciones (referencia)
+    essalud = 0,                   // Monto ESSALUD manual (ingresado por el contador)
+    sis = 0,                       // Monto SIS manual (alternativa ESSALUD para MYPE)
+    retenciones5ta = 0,
+    cantidadTrabajadores5ta = 0,
+    vidaLey = 0
+  } = params;
+
+  // Total de trabajadores y remuneraciones (referencia)
+  const totalTrabajadores = cantidadTrabajadores || (cantidadTrabajadoresONP + cantidadTrabajadoresAFP);
+  const baseRemuneraciones = totalRemuneraciones || (totalRemuneracionesONP + totalRemuneracionesAFP);
+
+  // ONP = 13% SOLO sobre remuneraciones de trabajadores en ONP (calculado automáticamente)
+  const onp = Math.round(totalRemuneracionesONP * TASA_ONP * 100) / 100;
+
+  // ESSALUD y SIS: montos ingresados manualmente por el contador
+  // Ref: ESSALUD = 9% × totalRemuneraciones; SIS-MYPE ≈ S/ 15 por trabajador
+  const totalAPagar = Math.round((essalud + sis + onp + retenciones5ta + vidaLey) * 100) / 100;
+
+  return {
+    cantidadTrabajadores: totalTrabajadores,
+    totalRemuneraciones: baseRemuneraciones,
+    essalud,
+    sis,
+    onp,
+    cantidadTrabajadoresONP,
+    totalRemuneracionesONP,
+    cantidadTrabajadoresAFP,
+    totalRemuneracionesAFP,
+    retenciones5ta,
+    cantidadTrabajadores5ta,
+    vidaLey,
+    totalAPagar,
+    desglose: {
+      essalud: { monto: essalud, nota: 'Monto manual — trabajadores ESSALUD' },
+      sis: { monto: sis, nota: 'Monto manual — trabajadores SIS-MYPE' },
+      onp: { tasa: TASA_ONP, base: totalRemuneracionesONP, nota: 'Solo trabajadores ONP', monto: onp },
+      afpEnPLAME: { cantidadTrabajadoresAFP, totalRemuneracionesAFP, nota: 'Incluidos en ESSALUD/SIS, aporte AFP va a AFPnet' },
+      retenciones5ta: { monto: retenciones5ta },
+      vidaLey: { monto: vidaLey }
+    }
+  };
+};
+
+// ========================================
+// 🏦 CÁLCULO DE AFP (AFPnet)
+// ========================================
+
+/**
+ * Calcular declaración de AFP
+ * @param {Object} params
+ * @param {string} params.afpNombre - Nombre de la AFP (HABITAT, INTEGRA, PRIMA, PROFUTURO)
+ * @param {number} params.cantidadAfiliados - Nº de trabajadores afiliados
+ * @param {number} params.totalRemuneraciones - Suma remuneraciones de afiliados AFP
+ * @param {number} params.aporteVoluntario - Aporte voluntario adicional
+ * @returns {Object} Detalle del cálculo AFP
+ */
+export const calcularAFP = (params = {}) => {
+  const {
+    afpNombre = '',
+    cantidadAfiliados = 0,
+    totalRemuneraciones = 0,
+    aporteVoluntario = 0
+  } = params;
+
+  const tasas = AFP_TASAS[afpNombre] || { comision: 0, primaSeguro: 0 };
+
+  // Aporte obligatorio: 10% de la remuneración
+  const aporteObligatorio = Math.round(totalRemuneraciones * TASA_AFP_APORTE * 100) / 100;
+
+  // Comisión AFP (varía por AFP)
+  const comisionAFP = Math.round(totalRemuneraciones * tasas.comision * 100) / 100;
+
+  // Prima de seguro (~1.86%)
+  const primaSeguro = Math.round(totalRemuneraciones * tasas.primaSeguro * 100) / 100;
+
+  // Total
+  const totalAPagar = Math.round((aporteObligatorio + comisionAFP + primaSeguro + aporteVoluntario) * 100) / 100;
+
+  return {
+    afpNombre,
+    cantidadAfiliados,
+    totalRemuneraciones,
+    aporteObligatorio,
+    comisionAFP,
+    primaSeguro,
+    aporteVoluntario,
+    totalAPagar,
+    tasasAplicadas: {
+      aporteObligatorio: TASA_AFP_APORTE,
+      comision: tasas.comision,
+      primaSeguro: tasas.primaSeguro
+    }
+  };
 };
 
 export default {
@@ -324,5 +468,7 @@ export default {
   calcularRentaMYPE,
   calcularRentaGeneral,
   calcularDeclaracionCompleta,
+  calcularPlanilla,
+  calcularAFP,
   CONSTANTES_TRIBUTARIAS
 };

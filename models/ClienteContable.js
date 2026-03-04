@@ -272,7 +272,23 @@ const clienteContableSchema = new mongoose.Schema(
         igv: { type: Boolean, default: true },
         renta: { type: Boolean, default: true },
         planilla: { type: Boolean, default: false },
+        afp: { type: Boolean, default: false },
         librosElectronicos: { type: Boolean, default: false }
+      },
+      // Configuración de Planilla
+      configPlanilla: {
+        cantidadTrabajadores: { type: Number, min: 0, default: 0 },
+        tieneONP: { type: Boolean, default: false },
+        tiene5ta: { type: Boolean, default: false }
+      },
+      // Configuración de AFP
+      configAFP: {
+        afpNombre: {
+          type: String,
+          enum: ['HABITAT', 'INTEGRA', 'PRIMA', 'PROFUTURO', ''],
+          default: ''
+        },
+        cantidadAfiliados: { type: Number, min: 0, default: 0 }
       },
       // Libros electrónicos que el cliente debe llevar (códigos del catálogo)
       librosElectronicos: [{

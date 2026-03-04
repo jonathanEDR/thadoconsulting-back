@@ -836,7 +836,7 @@ export const getMiCuentaContable = async (req, res) => {
       });
     }
     
-    // Devolver datos limitados (sin info sensible)
+    // Devolver datos del cliente (sin info sensible del contador)
     res.json({
       success: true,
       data: {
@@ -845,9 +845,46 @@ export const getMiCuentaContable = async (req, res) => {
         razonSocial: cliente.razonSocial,
         nombreComercial: cliente.nombreComercial,
         regimenTributario: cliente.regimenTributario,
+        zonaIGV: cliente.zonaIGV || 'GRAVADA',
         estado: cliente.estado,
+        // Contacto y representante
+        contacto: {
+          email: cliente.contacto?.email || '',
+          telefono: cliente.contacto?.telefono || '',
+          celular: cliente.contacto?.celular || ''
+        },
+        representante: {
+          nombre: cliente.representante?.nombre || '',
+          dni: cliente.representante?.dni || '',
+          cargo: cliente.representante?.cargo || ''
+        },
+        direccionFiscal: cliente.direccionFiscal || '',
+        ubicacion: cliente.ubicacion || {},
+        // Honorarios
+        honorarioMensual: cliente.honorarioMensual || 0,
+        moneda: cliente.moneda || 'PEN',
+        // Google Drive
+        linkDrive: cliente.linkDrive || '',
+        // Configuración tributaria (solo lo relevante para el cliente)
+        configuracionTributaria: {
+          actividadEconomica: cliente.configuracionTributaria?.actividadEconomica || '',
+          obligaciones: cliente.configuracionTributaria?.obligaciones || {},
+          configPlanilla: cliente.configuracionTributaria?.configPlanilla || {},
+          configAFP: cliente.configuracionTributaria?.configAFP || {}
+        },
+        // Documentos compartidos
+        documentos: (cliente.documentos || []).map(doc => ({
+          _id: doc._id,
+          nombre: doc.nombre,
+          tipo: doc.tipo,
+          url: doc.url,
+          periodo: doc.periodo,
+          notas: doc.notas,
+          fechaSubida: doc.fechaSubida
+        })),
         contadorAsignado: {
-          nombre: cliente.contadorAsignado?.nombre || 'No asignado'
+          nombre: cliente.contadorAsignado?.nombre || 'No asignado',
+          email: cliente.contadorAsignado?.email || ''
         }
       }
     });
@@ -857,6 +894,275 @@ export const getMiCuentaContable = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al obtener datos contables',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// ========================================
+// 📝 NOTAS DEL CLIENTE
+// ========================================
+
+/**
+ * @desc    Agregar nota a un cliente contable
+ * @route   POST /api/contabilidad/clientes/:id/notas
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const agregarNota = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role, clerkId, firstName, lastName } = req.user;
+
+    if (!hasPermission(role, PERMISSIONS.MANAGE_ACCOUNTING_CLIENTS)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para agregar notas'
+      });
+    }
+
+    const { tipo, descripcion } = req.body;
+
+    if (!descripcion || !descripcion.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'La descripción de la nota es requerida'
+      });
+    }
+
+    const cliente = await ClienteContable.findById(id);
+    if (!cliente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cliente contable no encontrado'
+      });
+    }
+
+    const tiposValidos = ['nota', 'llamada', 'email', 'reunion', 'recordatorio', 'cambio_estado'];
+    const tipoNota = tiposValidos.includes(tipo) ? tipo : 'nota';
+
+    cliente.notas.push({
+      tipo: tipoNota,
+      descripcion: descripcion.trim(),
+      creadoPor: {
+        userId: clerkId,
+        nombre: [firstName, lastName].filter(Boolean).join(' ') || 'Contador'
+      },
+      fecha: new Date()
+    });
+
+    await cliente.save();
+
+    // Devolver el cliente actualizado
+    const clienteActualizado = await ClienteContable.findById(id).lean({ virtuals: true });
+
+    res.json({
+      success: true,
+      message: 'Nota agregada exitosamente',
+      data: clienteActualizado
+    });
+
+  } catch (error) {
+    logger.error('Error agregando nota al cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al agregar nota',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * @desc    Eliminar nota de un cliente contable
+ * @route   DELETE /api/contabilidad/clientes/:id/notas/:notaId
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const eliminarNota = async (req, res) => {
+  try {
+    const { id, notaId } = req.params;
+    const { role } = req.user;
+
+    if (!hasPermission(role, PERMISSIONS.MANAGE_ACCOUNTING_CLIENTS)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para eliminar notas'
+      });
+    }
+
+    const cliente = await ClienteContable.findById(id);
+    if (!cliente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cliente contable no encontrado'
+      });
+    }
+
+    const notaIndex = cliente.notas.findIndex(n => n._id.toString() === notaId);
+    if (notaIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Nota no encontrada'
+      });
+    }
+
+    cliente.notas.splice(notaIndex, 1);
+    await cliente.save();
+
+    const clienteActualizado = await ClienteContable.findById(id).lean({ virtuals: true });
+
+    res.json({
+      success: true,
+      message: 'Nota eliminada exitosamente',
+      data: clienteActualizado
+    });
+
+  } catch (error) {
+    logger.error('Error eliminando nota del cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar nota',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// ========================================
+// 📎 DOCUMENTOS DEL CLIENTE
+// ========================================
+
+/**
+ * @desc    Agregar documento (link) a un cliente contable
+ * @route   POST /api/contabilidad/clientes/:id/documentos
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const agregarDocumento = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role, clerkId, firstName, lastName } = req.user;
+
+    if (!hasPermission(role, PERMISSIONS.MANAGE_ACCOUNTING_CLIENTS)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para agregar documentos'
+      });
+    }
+
+    const { nombre, tipo, url, periodo, notas } = req.body;
+
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'El nombre del documento es requerido'
+      });
+    }
+
+    if (!url || !url.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'La URL del documento es requerida'
+      });
+    }
+
+    // Validar URL básica
+    if (!/^https?:\/\/.+/.test(url.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'La URL debe ser válida (comenzar con http:// o https://)'
+      });
+    }
+
+    const cliente = await ClienteContable.findById(id);
+    if (!cliente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cliente contable no encontrado'
+      });
+    }
+
+    const tiposValidos = ['pdt', 'voucher', 'contrato', 'constancia', 'declaracion', 'otro'];
+    const tipoDoc = tiposValidos.includes(tipo) ? tipo : 'otro';
+
+    cliente.documentos.push({
+      nombre: nombre.trim(),
+      tipo: tipoDoc,
+      url: url.trim(),
+      periodo: periodo || null,
+      notas: notas?.trim() || '',
+      subidoPor: {
+        userId: clerkId,
+        nombre: [firstName, lastName].filter(Boolean).join(' ') || 'Contador'
+      },
+      fechaSubida: new Date()
+    });
+
+    await cliente.save();
+
+    const clienteActualizado = await ClienteContable.findById(id).lean({ virtuals: true });
+
+    res.json({
+      success: true,
+      message: 'Documento agregado exitosamente',
+      data: clienteActualizado
+    });
+
+  } catch (error) {
+    logger.error('Error agregando documento al cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al agregar documento',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * @desc    Eliminar documento de un cliente contable
+ * @route   DELETE /api/contabilidad/clientes/:id/documentos/:docId
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const eliminarDocumento = async (req, res) => {
+  try {
+    const { id, docId } = req.params;
+    const { role } = req.user;
+
+    if (!hasPermission(role, PERMISSIONS.MANAGE_ACCOUNTING_CLIENTS)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para eliminar documentos'
+      });
+    }
+
+    const cliente = await ClienteContable.findById(id);
+    if (!cliente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cliente contable no encontrado'
+      });
+    }
+
+    const docIndex = cliente.documentos.findIndex(d => d._id.toString() === docId);
+    if (docIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    cliente.documentos.splice(docIndex, 1);
+    await cliente.save();
+
+    const clienteActualizado = await ClienteContable.findById(id).lean({ virtuals: true });
+
+    res.json({
+      success: true,
+      message: 'Documento eliminado exitosamente',
+      data: clienteActualizado
+    });
+
+  } catch (error) {
+    logger.error('Error eliminando documento del cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar documento',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

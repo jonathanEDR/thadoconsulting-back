@@ -15,19 +15,27 @@ import {
   getSemaforoVencimientos,
   getEstadisticas,
   getClientesMapa,
-  getMiCuentaContable
+  getMiCuentaContable,
+  agregarNota,
+  eliminarNota,
+  agregarDocumento,
+  eliminarDocumento
 } from '../controllers/clientesContablesController.js';
 
 // Controllers de Declaraciones
 import {
   registrarDeclaracion,
   calcularImpuestosPreview,
+  calcularPlanillaPreview,
+  calcularAFPPreview,
+  getAFPProviders,
   getHistorialDeclaraciones,
   getResumenAnual,
   actualizarDeclaracion,
   cambiarEstadoDeclaracion,
   getMisDeclaraciones,
-  getMiEstado
+  getMiEstado,
+  eliminarDeclaracion,
 } from '../controllers/declaracionesController.js';
 
 // Controllers de Proyecciones
@@ -87,16 +95,24 @@ router.route('/clientes/:id')
 router.patch('/clientes/:id/reactivar', reactivarCliente);                     // PATCH  /api/contabilidad/clientes/:id/reactivar
 router.post('/clientes/:id/vincular-usuario', vincularUsuario);                // POST   /api/contabilidad/clientes/:id/vincular-usuario
 router.delete('/clientes/:id/vincular-usuario', desvincularUsuario);           // DELETE /api/contabilidad/clientes/:id/vincular-usuario
+router.post('/clientes/:id/notas', agregarNota);                               // POST   /api/contabilidad/clientes/:id/notas
+router.delete('/clientes/:id/notas/:notaId', eliminarNota);                    // DELETE /api/contabilidad/clientes/:id/notas/:notaId
+router.post('/clientes/:id/documentos', agregarDocumento);                     // POST   /api/contabilidad/clientes/:id/documentos
+router.delete('/clientes/:id/documentos/:docId', eliminarDocumento);            // DELETE /api/contabilidad/clientes/:id/documentos/:docId
 
 // ========================================
 // 📄 DECLARACIONES MENSUALES
 // ========================================
 router.post('/declaraciones', registrarDeclaracion);                            // POST   /api/contabilidad/declaraciones
 router.post('/declaraciones/calcular', calcularImpuestosPreview);               // POST   /api/contabilidad/declaraciones/calcular
+router.post('/declaraciones/calcular-planilla', calcularPlanillaPreview);       // POST   /api/contabilidad/declaraciones/calcular-planilla
+router.post('/declaraciones/calcular-afp', calcularAFPPreview);                // POST   /api/contabilidad/declaraciones/calcular-afp
+router.get('/declaraciones/afp-providers', getAFPProviders);                    // GET    /api/contabilidad/declaraciones/afp-providers
 router.get('/declaraciones/cliente/:clienteId', getHistorialDeclaraciones);      // GET    /api/contabilidad/declaraciones/cliente/:clienteId
 router.get('/declaraciones/resumen-anual/:clienteId', getResumenAnual);         // GET    /api/contabilidad/declaraciones/resumen-anual/:clienteId
 router.put('/declaraciones/:id', actualizarDeclaracion);                        // PUT    /api/contabilidad/declaraciones/:id
 router.patch('/declaraciones/:id/estado', cambiarEstadoDeclaracion);            // PATCH  /api/contabilidad/declaraciones/:id/estado
+router.delete('/declaraciones/:id', eliminarDeclaracion);                       // DELETE /api/contabilidad/declaraciones/:id
 
 // ========================================
 // 📊 PROYECCIONES DE PAGO

@@ -1,6 +1,7 @@
 import DeclaracionMensual from '../models/DeclaracionMensual.js';
+import { TIPOS_DECLARACION, AFP_PROVIDERS } from '../models/DeclaracionMensual.js';
 import ClienteContable from '../models/ClienteContable.js';
-import { calcularIGV, calcularRenta, calcularDeclaracionCompleta } from '../services/calculadoraImpuestos.js';
+import { calcularIGV, calcularRenta, calcularDeclaracionCompleta, calcularPlanilla, calcularAFP } from '../services/calculadoraImpuestos.js';
 import { obtenerFechaVencimiento } from '../services/cronogramaService.js';
 import { hasPermission } from '../utils/roleHelper.js';
 import { PERMISSIONS } from '../config/roles.js';
@@ -34,6 +35,7 @@ export const registrarDeclaracion = async (req, res) => {
     const {
       clienteId,
       periodo,
+      tipo = 'IGV_RENTA',
       ventasGravadas,
       ventasNoGravadas,
       ventasExportacion,
@@ -46,7 +48,24 @@ export const registrarDeclaracion = async (req, res) => {
       fechaPresentacion,
       pago,
       observaciones,
-      estado
+      estado,
+      // Planilla fields
+      cantidadTrabajadores,
+      totalRemuneraciones,
+      cantidadTrabajadoresONP,
+      totalRemuneracionesONP,
+      cantidadTrabajadoresAFP,    // AFP dentro de PLAME
+      totalRemuneracionesAFP,     // Rem. AFP en PLAME
+      essalud,                    // Monto ESSALUD manual
+      sis,                        // Monto SIS manual (alternativa ESSALUD para MYPE)
+      retenciones5ta,
+      cantidadTrabajadores5ta,
+      vidaLey,
+      // AFP (AFPnet) fields
+      afpNombre,
+      cantidadAfiliados,
+      totalRemuneracionesAfpnet,  // Rem. para AFPnet (puede = totalRemuneracionesAFP de PLAME)
+      aporteVoluntario
     } = req.body;
     
     // Verificar que el cliente existe
@@ -65,10 +84,11 @@ export const registrarDeclaracion = async (req, res) => {
       });
     }
     
-    // Verificar que no exista una declaración para el mismo periodo
+    // Verificar que no exista una declaración del mismo tipo para el mismo periodo
     const existente = await DeclaracionMensual.findOne({
       clienteId,
       periodo,
+      tipo,
       activo: true,
       esRectificatoria: false
     });
@@ -76,7 +96,7 @@ export const registrarDeclaracion = async (req, res) => {
     if (existente) {
       return res.status(400).json({
         success: false,
-        message: `Ya existe una declaración para el periodo ${periodo}. Use rectificatoria si necesita modificarla.`,
+        message: `Ya existe una declaración de ${tipo} para el periodo ${periodo}. Use rectificatoria si necesita modificarla.`,
         declaracionExistente: existente._id
       });
     }
@@ -91,37 +111,81 @@ export const registrarDeclaracion = async (req, res) => {
       });
     }
     
-    // Calcular impuestos automáticamente
-    const calculo = calcularDeclaracionCompleta({
-      regimen: cliente.regimenTributario,
-      ventasGravadas: ventasGravadas || 0,
-      creditoFiscal: creditoFiscal || 0,
-      saldoFavorAnterior: saldoFavorAnterior || 0,
-      coeficiente: coeficiente || cliente.configuracionTributaria?.coeficienteRenta,
-      categoriaRUS: categoriaRUS || cliente.configuracionTributaria?.categoriaRUS,
-      zonaIGV: cliente.zonaIGV || 'GRAVADA'
-    });
+    // Calcular según tipo de declaración
+    let detalleIGV = null;
+    let detalleRenta = null;
+    let detallePlanilla = null;
+    let detalleAFP = null;
+    let totalFinal = 0;
+    let formularioFinal = formulario;
     
-    // Construir detalle IGV
-    const detalleIGV = calculo.detalleIGV ? {
-      ventasGravadas: ventasGravadas || 0,
-      ventasNoGravadas: ventasNoGravadas || 0,
-      ventasExportacion: ventasExportacion || 0,
-      debitoFiscal: calculo.detalleIGV.debitoFiscal,
-      creditoFiscal: calculo.detalleIGV.creditoFiscal,
-      igvResultante: calculo.detalleIGV.igvResultante,
-      saldoFavorAnterior: calculo.detalleIGV.saldoFavorAnterior,
-      igvAPagar: calculo.detalleIGV.igvAPagar,
-      saldoFavorSiguiente: calculo.detalleIGV.saldoFavorSiguiente
-    } : {
-      ventasGravadas: 0,
-      debitoFiscal: 0,
-      creditoFiscal: 0,
-      igvResultante: 0,
-      igvAPagar: 0,
-      saldoFavorAnterior: 0,
-      saldoFavorSiguiente: 0
-    };
+    if (tipo === 'PLANILLA') {
+      // Cálculo de Planilla (PLAME) — ESSALUD y SIS son montos manuales del contador
+      const calculoPlanilla = calcularPlanilla({
+        cantidadTrabajadores: cantidadTrabajadores || 0,
+        totalRemuneraciones: totalRemuneraciones || 0,
+        cantidadTrabajadoresONP: cantidadTrabajadoresONP || 0,
+        totalRemuneracionesONP: totalRemuneracionesONP || 0,
+        cantidadTrabajadoresAFP: cantidadTrabajadoresAFP || 0,
+        totalRemuneracionesAFP: totalRemuneracionesAFP || 0,
+        essalud: essalud || 0,
+        sis: sis || 0,
+        retenciones5ta: retenciones5ta || 0,
+        cantidadTrabajadores5ta: cantidadTrabajadores5ta || 0,
+        vidaLey: vidaLey || 0
+      });
+      detallePlanilla = calculoPlanilla;
+      totalFinal = calculoPlanilla.totalAPagar;
+      formularioFinal = formularioFinal || 'PLAME';
+      
+    } else if (tipo === 'AFP') {
+      // Cálculo de AFP (AFPnet) — declaración complementaria a PLAME
+      const calculoAFP = calcularAFP({
+        afpNombre: afpNombre || '',
+        cantidadAfiliados: cantidadAfiliados || 0,
+        totalRemuneraciones: totalRemuneracionesAfpnet || totalRemuneracionesAFP || 0,
+        aporteVoluntario: aporteVoluntario || 0
+      });
+      detalleAFP = calculoAFP;
+      totalFinal = calculoAFP.totalAPagar;
+      formularioFinal = formularioFinal || 'AFPNET';
+      
+    } else {
+      // IGV_RENTA (comportamiento existente)
+      const calculo = calcularDeclaracionCompleta({
+        regimen: cliente.regimenTributario,
+        ventasGravadas: ventasGravadas || 0,
+        creditoFiscal: creditoFiscal || 0,
+        saldoFavorAnterior: saldoFavorAnterior || 0,
+        coeficiente: coeficiente || cliente.configuracionTributaria?.coeficienteRenta,
+        categoriaRUS: categoriaRUS || cliente.configuracionTributaria?.categoriaRUS,
+        zonaIGV: cliente.zonaIGV || 'GRAVADA'
+      });
+      
+      detalleIGV = calculo.detalleIGV ? {
+        ventasGravadas: ventasGravadas || 0,
+        ventasNoGravadas: ventasNoGravadas || 0,
+        ventasExportacion: ventasExportacion || 0,
+        debitoFiscal: calculo.detalleIGV.debitoFiscal,
+        creditoFiscal: calculo.detalleIGV.creditoFiscal,
+        igvResultante: calculo.detalleIGV.igvResultante,
+        saldoFavorAnterior: calculo.detalleIGV.saldoFavorAnterior,
+        igvAPagar: calculo.detalleIGV.igvAPagar,
+        saldoFavorSiguiente: calculo.detalleIGV.saldoFavorSiguiente
+      } : {
+        ventasGravadas: 0,
+        debitoFiscal: 0,
+        creditoFiscal: 0,
+        igvResultante: 0,
+        igvAPagar: 0,
+        saldoFavorAnterior: 0,
+        saldoFavorSiguiente: 0
+      };
+      
+      detalleRenta = calculo.detalleRenta;
+      totalFinal = calculo.resumen.totalAPagar;
+      formularioFinal = formularioFinal || (cliente.regimenTributario === 'RUS' ? 'NRUS' : 'PDT621');
+    }
     
     // Determinar estado
     let estadoFinal = estado || 'PENDIENTE';
@@ -134,12 +198,15 @@ export const registrarDeclaracion = async (req, res) => {
     const nuevaDeclaracion = new DeclaracionMensual({
       clienteId,
       periodo,
+      tipo,
       anio: parseInt(periodo.split('-')[0]),
       mes: parseInt(periodo.split('-')[1]),
       detalleIGV,
-      detalleRenta: calculo.detalleRenta,
-      totalAPagar: calculo.resumen.totalAPagar,
-      formulario: formulario || (cliente.regimenTributario === 'RUS' ? 'NRUS' : 'PDT621'),
+      detalleRenta,
+      detallePlanilla,
+      detalleAFP,
+      totalAPagar: totalFinal,
+      formulario: formularioFinal,
       numeroOrden,
       pago: pago || {},
       fechaPresentacion: fechaPresentacion ? new Date(fechaPresentacion) : null,
@@ -155,13 +222,13 @@ export const registrarDeclaracion = async (req, res) => {
     
     await nuevaDeclaracion.save();
     
-    logger.info(`📄 Declaración registrada: ${cliente.razonSocial} - Periodo ${periodo} - Total: S/ ${calculo.resumen.totalAPagar}`);
+    const tipoLabel = tipo === 'PLANILLA' ? 'Planilla' : tipo === 'AFP' ? 'AFP' : 'IGV/Renta';
+    logger.info(`📄 Declaración ${tipoLabel} registrada: ${cliente.razonSocial} - Periodo ${periodo} - Total: S/ ${totalFinal}`);
     
     res.status(201).json({
       success: true,
       message: 'Declaración registrada exitosamente',
-      data: nuevaDeclaracion,
-      calculo: calculo.resumen
+      data: nuevaDeclaracion
     });
     
   } catch (error) {
@@ -271,7 +338,7 @@ export const calcularImpuestosPreview = async (req, res) => {
 export const getHistorialDeclaraciones = async (req, res) => {
   try {
     const { clienteId } = req.params;
-    const { anio, estado, page = 1, limit = 24 } = req.query;
+    const { anio, estado, tipo, page = 1, limit = 24 } = req.query;
     const { role } = req.user;
     
     if (!hasPermission(role, PERMISSIONS.VIEW_ACCOUNTING_DECLARATIONS)) {
@@ -289,6 +356,10 @@ export const getHistorialDeclaraciones = async (req, res) => {
     
     if (estado && estado !== 'todos') {
       filter.estado = estado;
+    }
+    
+    if (tipo && tipo !== 'todos') {
+      filter.tipo = tipo;
     }
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -372,6 +443,8 @@ export const getResumenAnual = async (req, res) => {
         resumen: resumen[0] || {
           totalIGV: 0,
           totalRenta: 0,
+          totalPlanilla: 0,
+          totalAFP: 0,
           totalPagado: 0,
           totalAPagar: 0,
           declaracionesPresentadas: 0,
@@ -594,7 +667,7 @@ export const getMisDeclaraciones = async (req, res) => {
     
     const [declaraciones, total] = await Promise.all([
       DeclaracionMensual.find(filter)
-        .select('periodo anio mes estado totalAPagar fechaPresentacion fechaVencimiento detalleIGV.igvAPagar detalleRenta.rentaAPagar detalleRenta.regimenAplicado pago.montoPagado')
+        .select('periodo anio mes tipo estado totalAPagar fechaPresentacion fechaVencimiento detalleIGV.igvAPagar detalleRenta.rentaAPagar detalleRenta.regimenAplicado detallePlanilla detalleAFP pago.montoPagado')
         .sort({ periodo: -1 })
         .skip(skip)
         .limit(parseInt(limit))
@@ -709,4 +782,155 @@ export const getMiEstado = async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
+};
+
+// ========================================
+// 🧮 CALCULAR PLANILLA (PREVIEW)
+// ========================================
+
+/**
+ * @desc    Calcular planilla sin guardar (preview)
+ * @route   POST /api/contabilidad/declaraciones/calcular-planilla
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const calcularPlanillaPreview = async (req, res) => {
+  try {
+    const {
+      cantidadTrabajadores,
+      totalRemuneraciones,
+      cantidadTrabajadoresONP,
+      totalRemuneracionesONP,
+      cantidadTrabajadoresAFP,
+      totalRemuneracionesAFP,
+      essalud,
+      sis,
+      retenciones5ta,
+      cantidadTrabajadores5ta,
+      vidaLey
+    } = req.body;
+
+    const resultado = calcularPlanilla({
+      cantidadTrabajadores: cantidadTrabajadores || 0,
+      totalRemuneraciones: totalRemuneraciones || 0,
+      cantidadTrabajadoresONP: cantidadTrabajadoresONP || 0,
+      totalRemuneracionesONP: totalRemuneracionesONP || 0,
+      cantidadTrabajadoresAFP: cantidadTrabajadoresAFP || 0,
+      totalRemuneracionesAFP: totalRemuneracionesAFP || 0,
+      essalud: essalud || 0,
+      sis: sis || 0,
+      retenciones5ta: retenciones5ta || 0,
+      cantidadTrabajadores5ta: cantidadTrabajadores5ta || 0,
+      vidaLey: vidaLey || 0
+    });
+
+    res.json({
+      success: true,
+      data: resultado
+    });
+  } catch (error) {
+    logger.error('Error calculando planilla:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Error al calcular planilla'
+    });
+  }
+};
+
+// ========================================
+// 🗑️ ELIMINAR DECLARACIÓN (SOFT DELETE)
+// ========================================
+
+/**
+ * @desc    Eliminar una declaración (soft delete — marca activo: false)
+ * @route   DELETE /api/contabilidad/declaraciones/:id
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const eliminarDeclaracion = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
+
+    const declaracion = await DeclaracionMensual.findById(id);
+    if (!declaracion) {
+      return res.status(404).json({ success: false, message: 'Declaración no encontrada' });
+    }
+
+    // Solo se pueden eliminar declaraciones PENDIENTES o que no hayan sido pagadas
+    if (declaracion.estado === 'PAGADO') {
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede eliminar una declaración ya pagada. Use rectificatoria.'
+      });
+    }
+
+    declaracion.activo = false;
+    declaracion.observaciones = motivo
+      ? `[ELIMINADA] ${motivo}`
+      : '[ELIMINADA POR ADMINISTRADOR]';
+    await declaracion.save();
+
+    logger.info(`Declaración ${id} eliminada (tipo: ${declaracion.tipo}, periodo: ${declaracion.periodo})`);
+
+    res.json({
+      success: true,
+      message: `Declaración ${declaracion.tipo} del periodo ${declaracion.periodo} eliminada correctamente`
+    });
+  } catch (error) {
+    logger.error('Error eliminando declaración:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error al eliminar declaración' });
+  }
+};
+
+// ========================================
+// 🧮 CALCULAR AFP (PREVIEW)
+// ========================================
+
+/**
+ * @desc    Calcular AFP sin guardar (preview)
+ * @route   POST /api/contabilidad/declaraciones/calcular-afp
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const calcularAFPPreview = async (req, res) => {
+  try {
+    const {
+      afpNombre,
+      cantidadAfiliados,
+      totalRemuneraciones,
+      aporteVoluntario
+    } = req.body;
+
+    const resultado = calcularAFP({
+      afpNombre: afpNombre || '',
+      cantidadAfiliados: cantidadAfiliados || 0,
+      totalRemuneraciones: totalRemuneraciones || 0,
+      aporteVoluntario: aporteVoluntario || 0
+    });
+
+    res.json({
+      success: true,
+      data: resultado
+    });
+  } catch (error) {
+    logger.error('Error calculando AFP:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Error al calcular AFP'
+    });
+  }
+};
+
+// ========================================
+// 📊 OBTENER CONSTANTES AFP
+// ========================================
+
+/**
+ * @desc    Obtener constantes AFP (proveedores y tasas)
+ * @route   GET /api/contabilidad/declaraciones/afp-providers
+ * @access  Private
+ */
+export const getAFPProviders = async (req, res) => {
+  res.json({
+    success: true,
+    data: AFP_PROVIDERS
+  });
 };
