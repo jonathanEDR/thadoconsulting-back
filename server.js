@@ -33,6 +33,7 @@ import agentsBlogSessionRoutes from './routes/agents-blog-session.js';
 import directMessagesRoutes from './routes/directMessages.js';
 import contabilidadRoutes from './routes/contabilidad.js';
 import notificationsRoutes from './routes/notifications.js';
+import meetingRoomRoutes from './routes/meetingRoom.js';
 import { cmsLogger } from './middleware/logger.js';
 import { 
   initializeSecurityMiddleware, 
@@ -501,6 +502,7 @@ app.use('/api/events', generalLimiter, eventRoutes); // 📅 Events/Agenda Syste
 app.use('/api/seo-monitor', generalLimiter, seoMonitorRoutes); // 📊 SEO Monitoring System
 app.use('/api/direct-messages', generalLimiter, directMessagesRoutes); // 📧 Direct Messages to Users
 app.use('/api/contabilidad', generalLimiter, contabilidadRoutes); // 🏢 Módulo Contabilidad (Gestión Clientes Contables)
+app.use('/api/meeting', generalLimiter, meetingRoomRoutes); // 🎥 Sala de Reuniones Virtual (SERSI)
 
 // Manejo de rutas no encontradas
 app.use((req, res) => {
