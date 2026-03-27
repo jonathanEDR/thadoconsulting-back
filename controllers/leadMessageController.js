@@ -8,7 +8,7 @@ import logger from '../utils/logger.js';
  * 🔧 Helper: Verificar acceso al lead
  */
 const verificarAccesoLead = async (leadId, userId, role) => {
-  const lead = await Lead.findById(leadId).lean();
+  const lead = await Lead.findById(leadId);
   
   if (!lead) {
     throw new Error('Lead no encontrado');
@@ -535,6 +535,87 @@ export const getMensajesNoLeidos = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error obteniendo mensajes no leídos'
+    });
+  }
+};
+
+/**
+ * @desc    Obtener estadísticas globales de mensajes
+ * @route   GET /api/crm/messages/stats
+ * @access  Private (ADMIN, SUPER_ADMIN)
+ */
+export const getMessageStats = async (req, res) => {
+  try {
+    const { clerkId: userId, role } = req.user;
+
+    // Construir filtro base según rol
+    let matchFilter = { eliminado: false };
+
+    if (role === 'CLIENT') {
+      matchFilter['destinatario.userId'] = userId;
+      matchFilter.esPrivado = false;
+    } else if (role === 'MODERATOR') {
+      const leads = await Lead.find({
+        'asignadoA.userId': userId,
+        activo: true
+      }).select('_id');
+      const leadIds = leads.map(l => l._id);
+      matchFilter.leadId = { $in: leadIds };
+    }
+    // ADMIN y SUPER_ADMIN ven todas las estadísticas
+
+    const [stats] = await LeadMessage.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          noLeidos: {
+            $sum: { $cond: [{ $eq: ['$leido', false] }, 1, 0] }
+          },
+          enviados: {
+            $sum: {
+              $cond: [
+                { $in: ['$tipo', ['mensaje_cliente', 'nota_interna']] },
+                1,
+                0
+              ]
+            }
+          },
+          respondidos: {
+            $sum: {
+              $cond: [{ $eq: ['$tipo', 'respuesta_cliente'] }, 1, 0]
+            }
+          },
+          porTipo: { $push: '$tipo' }
+        }
+      }
+    ]);
+
+    // Agrupar porTipo en un objeto { tipo: count }
+    const porTipoMap = {};
+    if (stats?.porTipo) {
+      for (const tipo of stats.porTipo) {
+        porTipoMap[tipo] = (porTipoMap[tipo] || 0) + 1;
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total: stats?.total || 0,
+        noLeidos: stats?.noLeidos || 0,
+        enviados: stats?.enviados || 0,
+        respondidos: stats?.respondidos || 0,
+        porTipo: porTipoMap
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas de mensajes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo estadísticas de mensajes'
     });
   }
 };

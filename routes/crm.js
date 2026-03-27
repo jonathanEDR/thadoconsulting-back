@@ -23,6 +23,7 @@ import {
   marcarMensajeLeido,
   eliminarMensaje,
   getMensajesNoLeidos,
+  getMessageStats,
   buscarMensajes
 } from '../controllers/leadMessageController.js';
 import {
@@ -101,6 +102,7 @@ router.patch('/messages/:messageId/read', marcarMensajeLeido);     // PATCH /api
 router.delete('/messages/:messageId', eliminarMensaje);            // DELETE /api/crm/messages/:messageId
 
 // Mensajes generales
+router.get('/messages/stats', getMessageStats);                    // GET /api/crm/messages/stats
 router.get('/messages/unread', getMensajesNoLeidos);               // GET /api/crm/messages/unread
 router.get('/messages/search', buscarMensajes);                    // GET /api/crm/messages/search
 
