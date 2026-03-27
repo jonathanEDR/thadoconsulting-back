@@ -3,6 +3,11 @@ import Lead from '../models/Lead.js';
 import { hasPermission } from '../utils/roleHelper.js';
 import { PERMISSIONS } from '../config/roles.js';
 import logger from '../utils/logger.js';
+import {
+  notificarMensajeInterno,
+  notificarMensajeCliente,
+  notificarRespuestaCliente
+} from '../utils/notificationService.js';
 
 /**
  * 🔧 Helper: Verificar acceso al lead
@@ -185,6 +190,11 @@ export const enviarMensajeInterno = async (req, res) => {
     // También agregar a las actividades del lead (para mantener compatibilidad)
     await lead.agregarMensajeInterno(contenido, req.user);
     
+    // 🔔 Notificar a usuarios relevantes (async, no bloquea la respuesta)
+    notificarMensajeInterno(mensaje, lead).catch(err =>
+      logger.error('Error en notificación de mensaje interno:', err)
+    );
+    
     logger.info(`Mensaje interno creado en lead ${leadId} por ${userId}`);
     
     res.status(201).json({
@@ -266,7 +276,12 @@ export const enviarMensajeCliente = async (req, res) => {
     // También agregar a las actividades del lead
     await lead.enviarMensajeCliente(contenido, req.user);
     
-    // 📧 Email deshabilitado temporalmente
+    // � Notificar al cliente (async, no bloquea la respuesta)
+    notificarMensajeCliente(mensaje, lead).catch(err =>
+      logger.error('Error en notificación al cliente:', err)
+    );
+    
+    // �📧 Email deshabilitado temporalmente
     // Para habilitar: configurar RESEND_API_KEY en .env y descomentar emailService import
     const emailStatus = process.env.RESEND_API_KEY ? 'configurado pero no implementado' : 'deshabilitado';
     
@@ -370,6 +385,24 @@ export const responderMensaje = async (req, res) => {
     
     // Actualizar mensaje original
     await mensajeOriginal.agregarRespuesta(respuesta._id);
+    
+    // 🔔 Notificar según el tipo de respuesta (async, no bloquea)
+    if (role === 'CLIENT') {
+      // Cliente responde → notificar al equipo
+      notificarRespuestaCliente(respuesta, lead).catch(err =>
+        logger.error('Error en notificación de respuesta cliente:', err)
+      );
+    } else if (tipoRespuesta === 'mensaje_cliente') {
+      // Equipo responde al cliente → notificar al cliente
+      notificarMensajeCliente(respuesta, lead).catch(err =>
+        logger.error('Error en notificación al cliente:', err)
+      );
+    } else {
+      // Nota interna → notificar al equipo
+      notificarMensajeInterno(respuesta, lead).catch(err =>
+        logger.error('Error en notificación de nota interna:', err)
+      );
+    }
     
     logger.info(`Respuesta creada para mensaje ${messageId} por ${userId}`);
     

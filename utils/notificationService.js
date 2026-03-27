@@ -1,9 +1,10 @@
 import logger from './logger.js';
+import Notification from '../models/Notification.js';
+import User from '../models/User.js';
 
 /**
- * 🔔 Servicio de Notificaciones Simple
- * Sistema básico para notificar eventos de mensajería
- * Se puede extender con email, push notifications, etc.
+ * 🔔 Servicio de Notificaciones - Persistido en MongoDB
+ * Crea notificaciones reales que el frontend consulta via polling
  */
 
 /**
@@ -19,48 +20,74 @@ export const NOTIFICATION_TYPES = {
 };
 
 /**
- * Cola de notificaciones pendientes
- * En producción, esto debería usar Redis o una cola real
+ * Resolver usuario por clerkId para obtener userId (ObjectId) y clerkId
+ * @param {string} clerkId - Clerk ID del usuario
+ * @returns {object|null} - { _id, clerkId } o null
  */
-const notificationQueue = [];
+const resolverUsuario = async (clerkId) => {
+  if (!clerkId) return null;
+  try {
+    const user = await User.findOne({ clerkId }).select('_id clerkId').lean();
+    return user;
+  } catch (error) {
+    logger.error(`Error resolviendo usuario ${clerkId}:`, error);
+    return null;
+  }
+};
 
 /**
- * Crear notificación
+ * Crear notificación persistida en MongoDB
  * @param {object} options - Opciones de la notificación
- * @returns {object} - Notificación creada
+ * @returns {array} - Notificaciones creadas
  */
 export const crearNotificacion = async ({
   tipo,
   titulo,
   mensaje,
-  destinatarios = [], // Array de userIds
+  destinatarios = [], // Array de clerkIds
   metadata = {},
-  prioridad = 'normal'
+  prioridad = 'normal',
+  accion = null
 }) => {
   try {
-    const notificacion = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    if (destinatarios.length === 0) {
+      logger.warn(`📬 Notificación ${tipo} sin destinatarios, omitida`);
+      return [];
+    }
+
+    // Resolver todos los usuarios en paralelo
+    const usuarios = await Promise.all(
+      destinatarios.map(clerkId => resolverUsuario(clerkId))
+    );
+
+    const usuariosValidos = usuarios.filter(Boolean);
+
+    if (usuariosValidos.length === 0) {
+      logger.warn(`📬 Ningún destinatario válido para notificación ${tipo}`);
+      return [];
+    }
+
+    // Crear notificaciones en batch usando el modelo Notification
+    const notificacionesData = usuariosValidos.map(user => ({
+      userId: user._id,
+      clerkId: user.clerkId,
       tipo,
       titulo,
       mensaje,
-      destinatarios,
-      metadata,
       prioridad,
-      leida: false,
-      creadaEn: new Date(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 días
-    };
-    
-    // Agregar a la cola (en producción, usar Redis/Queue service)
-    notificationQueue.push(notificacion);
-    
-    logger.info(`📬 Notificación creada: ${tipo} para ${destinatarios.length} usuarios`);
-    
-    return notificacion;
-    
+      metadata,
+      ...(accion && { accion })
+    }));
+
+    const notificaciones = await Notification.insertMany(notificacionesData);
+
+    logger.info(`📬 Notificación ${tipo} creada para ${notificaciones.length} usuario(s)`);
+
+    return notificaciones;
+
   } catch (error) {
     logger.error('Error creando notificación:', error);
-    throw error;
+    return [];
   }
 };
 
@@ -92,9 +119,14 @@ export const notificarMensajeInterno = async (mensaje, lead) => {
         mensaje: `${mensaje.autor.nombre} agregó una nota interna`,
         destinatarios,
         metadata: {
-          leadId: lead._id,
-          messageId: mensaje._id,
+          leadId: lead._id?.toString(),
+          messageId: mensaje._id?.toString(),
           leadNombre: lead.nombre
+        },
+        accion: {
+          tipo: 'link',
+          url: `/dashboard/crm/messages`,
+          label: 'Ver mensaje'
         },
         prioridad: mensaje.prioridad || 'normal'
       });
@@ -120,25 +152,23 @@ export const notificarMensajeCliente = async (mensaje, lead) => {
     await crearNotificacion({
       tipo: NOTIFICATION_TYPES.MENSAJE_CLIENTE,
       titulo: `Nuevo mensaje del equipo`,
-      mensaje: mensaje.asunto || 'Tienes un nuevo mensaje',
+      mensaje: mensaje.asunto || 'Tienes un nuevo mensaje de THADO Consulting',
       destinatarios: [lead.usuarioRegistrado.userId],
       metadata: {
-        leadId: lead._id,
-        messageId: mensaje._id,
+        leadId: lead._id?.toString(),
+        messageId: mensaje._id?.toString(),
         leadNombre: lead.nombre,
         autorNombre: mensaje.autor.nombre
+      },
+      accion: {
+        tipo: 'link',
+        url: `/dashboard/client/messages`,
+        label: 'Ver mensaje'
       },
       prioridad: mensaje.prioridad || 'normal'
     });
     
     logger.info(`📧 Notificación enviada al cliente: ${lead.usuarioRegistrado.email}`);
-    
-    // TODO: Aquí se podría integrar con servicio de email
-    // await enviarEmail({
-    //   to: lead.usuarioRegistrado.email,
-    //   subject: mensaje.asunto,
-    //   body: mensaje.contenido
-    // });
     
   } catch (error) {
     logger.error('Error notificando mensaje al cliente:', error);
@@ -146,7 +176,7 @@ export const notificarMensajeCliente = async (mensaje, lead) => {
 };
 
 /**
- * Notificar respuesta del cliente
+ * Notificar respuesta del cliente al equipo
  * @param {object} mensaje - Mensaje de respuesta
  * @param {object} lead - Lead asociado
  */
@@ -171,10 +201,15 @@ export const notificarRespuestaCliente = async (mensaje, lead) => {
         mensaje: `${mensaje.autor.nombre} respondió a tu mensaje`,
         destinatarios,
         metadata: {
-          leadId: lead._id,
-          messageId: mensaje._id,
+          leadId: lead._id?.toString(),
+          messageId: mensaje._id?.toString(),
           leadNombre: lead.nombre,
           clienteNombre: mensaje.autor.nombre
+        },
+        accion: {
+          tipo: 'link',
+          url: `/dashboard/crm/messages`,
+          label: 'Ver respuesta'
         },
         prioridad: 'alta'
       });
@@ -190,7 +225,7 @@ export const notificarRespuestaCliente = async (mensaje, lead) => {
 /**
  * Notificar lead asignado
  * @param {object} lead - Lead asignado
- * @param {string} asignadoA - Usuario al que se asignó
+ * @param {string} asignadoA - ClerkId del usuario al que se asignó
  */
 export const notificarLeadAsignado = async (lead, asignadoA) => {
   try {
@@ -200,10 +235,15 @@ export const notificarLeadAsignado = async (lead, asignadoA) => {
       mensaje: `Se te ha asignado el lead: ${lead.nombre}`,
       destinatarios: [asignadoA],
       metadata: {
-        leadId: lead._id,
+        leadId: lead._id?.toString(),
         leadNombre: lead.nombre,
         leadEstado: lead.estado,
         leadPrioridad: lead.prioridad
+      },
+      accion: {
+        tipo: 'link',
+        url: `/dashboard/crm`,
+        label: 'Ver lead'
       },
       prioridad: lead.prioridad === 'urgente' ? 'alta' : 'normal'
     });
@@ -242,7 +282,7 @@ export const notificarCambioEstado = async (lead, estadoAnterior, estadoNuevo) =
         mensaje: `El estado cambió de "${estadoAnterior}" a "${estadoNuevo}"`,
         destinatarios,
         metadata: {
-          leadId: lead._id,
+          leadId: lead._id?.toString(),
           leadNombre: lead.nombre,
           estadoAnterior,
           estadoNuevo
@@ -258,108 +298,6 @@ export const notificarCambioEstado = async (lead, estadoAnterior, estadoNuevo) =
   }
 };
 
-/**
- * Obtener notificaciones de un usuario
- * @param {string} userId - ID del usuario
- * @param {object} filtros - Filtros opcionales
- * @returns {array} - Array de notificaciones
- */
-export const obtenerNotificaciones = async (userId, filtros = {}) => {
-  try {
-    let notificaciones = notificationQueue.filter(n => 
-      n.destinatarios.includes(userId)
-    );
-    
-    // Aplicar filtros
-    if (filtros.noLeidas) {
-      notificaciones = notificaciones.filter(n => !n.leida);
-    }
-    
-    if (filtros.tipo) {
-      notificaciones = notificaciones.filter(n => n.tipo === filtros.tipo);
-    }
-    
-    // Ordenar por fecha (más recientes primero)
-    notificaciones.sort((a, b) => b.creadaEn - a.creadaEn);
-    
-    return notificaciones;
-    
-  } catch (error) {
-    logger.error('Error obteniendo notificaciones:', error);
-    return [];
-  }
-};
-
-/**
- * Marcar notificación como leída
- * @param {string} notificationId - ID de la notificación
- * @param {string} userId - ID del usuario
- */
-export const marcarComoLeida = async (notificationId, userId) => {
-  try {
-    const notificacion = notificationQueue.find(n => 
-      n.id === notificationId && n.destinatarios.includes(userId)
-    );
-    
-    if (notificacion) {
-      notificacion.leida = true;
-      notificacion.leidaEn = new Date();
-      logger.info(`✅ Notificación ${notificationId} marcada como leída por ${userId}`);
-    }
-    
-  } catch (error) {
-    logger.error('Error marcando notificación como leída:', error);
-  }
-};
-
-/**
- * Contar notificaciones no leídas
- * @param {string} userId - ID del usuario
- * @returns {number} - Cantidad de notificaciones no leídas
- */
-export const contarNoLeidas = async (userId) => {
-  try {
-    const noLeidas = notificationQueue.filter(n => 
-      n.destinatarios.includes(userId) && !n.leida
-    );
-    
-    return noLeidas.length;
-    
-  } catch (error) {
-    logger.error('Error contando notificaciones no leídas:', error);
-    return 0;
-  }
-};
-
-/**
- * Limpiar notificaciones expiradas
- * Ejecutar periódicamente (cron job)
- */
-export const limpiarNotificacionesExpiradas = async () => {
-  try {
-    const ahora = new Date();
-    const antes = notificationQueue.length;
-    
-    // Filtrar notificaciones no expiradas
-    const notificacionesValidas = notificationQueue.filter(n => 
-      n.expiresAt > ahora
-    );
-    
-    // Actualizar la cola
-    notificationQueue.length = 0;
-    notificationQueue.push(...notificacionesValidas);
-    
-    const eliminadas = antes - notificationQueue.length;
-    
-    if (eliminadas > 0) {
-      logger.info(`🗑️ ${eliminadas} notificaciones expiradas eliminadas`);
-    }
-    
-  } catch (error) {
-    logger.error('Error limpiando notificaciones expiradas:', error);
-  }
-};
-
 // Exportar servicio de notificaciones
 export default {
   crearNotificacion,
@@ -368,9 +306,5 @@ export default {
   notificarRespuestaCliente,
   notificarLeadAsignado,
   notificarCambioEstado,
-  obtenerNotificaciones,
-  marcarComoLeida,
-  contarNoLeidas,
-  limpiarNotificacionesExpiradas,
   NOTIFICATION_TYPES
 };
