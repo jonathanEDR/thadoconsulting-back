@@ -10,6 +10,11 @@ import logger from '../utils/logger.js';
  * CRUD completo + funcionalidades específicas de gestión contable
  */
 
+// Las consultas .lean() devuelven objetos planos y no aplican los getters
+// del schema (que exponen `estado` en mayúscula). Se normaliza aquí.
+const withEstadoMayuscula = (cliente) =>
+  cliente ? { ...cliente, estado: cliente.estado ? cliente.estado.toUpperCase() : cliente.estado } : cliente;
+
 // ========================================
 // 📋 LISTAR CLIENTES
 // ========================================
@@ -34,23 +39,23 @@ export const listarClientes = async (req, res) => {
     
     const {
       search,
-      regimen,
+      regimenTributario,
       estado = 'activo',
       page = 1,
       limit = 20,
       sort = 'razonSocial',
       order = 'asc'
     } = req.query;
-    
+
     // Construir filtro
     let filter = { activo: true };
-    
+
     if (estado && estado !== 'todos') {
-      filter.estado = estado;
+      filter.estado = estado.toLowerCase();
     }
-    
-    if (regimen && regimen !== 'todos') {
-      filter.regimenTributario = regimen;
+
+    if (regimenTributario && regimenTributario !== 'todos') {
+      filter.regimenTributario = regimenTributario;
     }
     
     // Búsqueda por texto
@@ -84,12 +89,12 @@ export const listarClientes = async (req, res) => {
     
     res.json({
       success: true,
-      data: clientes,
+      data: clientes.map(withEstadoMayuscula),
       pagination: {
-        current: parseInt(page),
-        total: Math.ceil(total / parseInt(limit)),
-        count: clientes.length,
-        totalItems: total
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit))
       }
     });
     
@@ -136,9 +141,9 @@ export const obtenerCliente = async (req, res) => {
     
     res.json({
       success: true,
-      data: cliente
+      data: withEstadoMayuscula(cliente)
     });
-    
+
   } catch (error) {
     logger.error('Error obteniendo cliente contable:', error);
     res.status(500).json({
@@ -405,6 +410,58 @@ export const darDeBajaCliente = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al dar de baja cliente contable',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// ========================================
+// 🗑️ ELIMINAR PERMANENTEMENTE (HARD DELETE)
+// ========================================
+
+/**
+ * @desc    Eliminar un cliente contable de forma permanente e irreversible
+ * @route   DELETE /api/contabilidad/clientes/:id/permanente
+ * @access  Private (SUPER_ADMIN)
+ */
+export const eliminarClientePermanente = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.user;
+
+    if (role !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo un Super Admin puede eliminar clientes contables de forma permanente'
+      });
+    }
+
+    const cliente = await ClienteContable.findById(id);
+
+    if (!cliente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cliente contable no encontrado'
+      });
+    }
+
+    const razonSocial = cliente.razonSocial;
+    const ruc = cliente.ruc;
+
+    await ClienteContable.findByIdAndDelete(id);
+
+    logger.info(`🗑️ Cliente contable eliminado PERMANENTEMENTE: ${razonSocial} (RUC: ${ruc}) por usuario ${req.user.id}`);
+
+    res.json({
+      success: true,
+      message: `Cliente ${razonSocial} eliminado permanentemente`
+    });
+
+  } catch (error) {
+    logger.error('Error eliminando permanentemente cliente contable:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar cliente contable',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -799,7 +856,7 @@ export const getClientesMapa = async (req, res) => {
 
     res.json({
       success: true,
-      data: clientes,
+      data: clientes.map(withEstadoMayuscula),
       total: clientes.length
     });
 
@@ -958,7 +1015,7 @@ export const agregarNota = async (req, res) => {
     res.json({
       success: true,
       message: 'Nota agregada exitosamente',
-      data: clienteActualizado
+      data: withEstadoMayuscula(clienteActualizado)
     });
 
   } catch (error) {
@@ -1012,7 +1069,7 @@ export const eliminarNota = async (req, res) => {
     res.json({
       success: true,
       message: 'Nota eliminada exitosamente',
-      data: clienteActualizado
+      data: withEstadoMayuscula(clienteActualizado)
     });
 
   } catch (error) {
@@ -1101,7 +1158,7 @@ export const agregarDocumento = async (req, res) => {
     res.json({
       success: true,
       message: 'Documento agregado exitosamente',
-      data: clienteActualizado
+      data: withEstadoMayuscula(clienteActualizado)
     });
 
   } catch (error) {
@@ -1155,7 +1212,7 @@ export const eliminarDocumento = async (req, res) => {
     res.json({
       success: true,
       message: 'Documento eliminado exitosamente',
-      data: clienteActualizado
+      data: withEstadoMayuscula(clienteActualizado)
     });
 
   } catch (error) {

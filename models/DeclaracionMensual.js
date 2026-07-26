@@ -75,6 +75,18 @@ const detalleIGVSchema = new mongoose.Schema({
     min: 0,
     default: 0
   },
+  // Compras gravadas a la tasa general (18%) — se guarda para poder re-editar la declaración
+  comprasGravadas: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // Compras gravadas a la tasa especial configurada en el cliente (ej. restaurantes - Ley 31556)
+  comprasGravadasEspecial: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
   creditoFiscal: {
     type: Number,
     min: 0,

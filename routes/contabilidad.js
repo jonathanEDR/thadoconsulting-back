@@ -8,6 +8,7 @@ import {
   crearCliente,
   actualizarCliente,
   darDeBajaCliente,
+  eliminarClientePermanente,
   reactivarCliente,
   vincularUsuario,
   desvincularUsuario,
@@ -92,6 +93,7 @@ router.route('/clientes/:id')
   .delete(darDeBajaCliente);// DELETE /api/contabilidad/clientes/:id
 
 // Acciones específicas de clientes
+router.delete('/clientes/:id/permanente', eliminarClientePermanente);          // DELETE /api/contabilidad/clientes/:id/permanente (hard delete, solo SUPER_ADMIN)
 router.patch('/clientes/:id/reactivar', reactivarCliente);                     // PATCH  /api/contabilidad/clientes/:id/reactivar
 router.post('/clientes/:id/vincular-usuario', vincularUsuario);                // POST   /api/contabilidad/clientes/:id/vincular-usuario
 router.delete('/clientes/:id/vincular-usuario', desvincularUsuario);           // DELETE /api/contabilidad/clientes/:id/vincular-usuario

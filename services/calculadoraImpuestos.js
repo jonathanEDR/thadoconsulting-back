@@ -50,12 +50,13 @@ const TASA_MINIMA_GENERAL = 0.015; // 1.5%
  * @returns {Object} Detalle del cálculo de IGV
  */
 export const calcularIGV = (ventasGravadas, creditoFiscal, saldoFavorAnterior = 0) => {
-  const debitoFiscal = Math.round(ventasGravadas * TASA_IGV * 100) / 100;
-  const igvResultante = Math.round((debitoFiscal - creditoFiscal) * 100) / 100;
-  
+  // SUNAT exige declarar los montos del PDT 621 en soles enteros, sin decimales
+  const debitoFiscal = Math.round(ventasGravadas * TASA_IGV);
+  const igvResultante = Math.round(debitoFiscal - creditoFiscal);
+
   let igvAPagar = 0;
   let saldoFavorSiguiente = 0;
-  
+
   if (igvResultante > 0) {
     // Hay IGV a pagar, aplicar saldo a favor si existe
     igvAPagar = Math.max(0, igvResultante - saldoFavorAnterior);
@@ -65,15 +66,15 @@ export const calcularIGV = (ventasGravadas, creditoFiscal, saldoFavorAnterior = 
     igvAPagar = 0;
     saldoFavorSiguiente = Math.abs(igvResultante) + saldoFavorAnterior;
   }
-  
+
   return {
     ventasGravadas,
     debitoFiscal,
     creditoFiscal,
     igvResultante,
     saldoFavorAnterior,
-    igvAPagar: Math.round(igvAPagar * 100) / 100,
-    saldoFavorSiguiente: Math.round(saldoFavorSiguiente * 100) / 100
+    igvAPagar: Math.round(igvAPagar),
+    saldoFavorSiguiente: Math.round(saldoFavorSiguiente)
   };
 };
 
@@ -115,7 +116,7 @@ export const calcularRentaRUS = (categoria, ingresosDelMes = 0) => {
  * @returns {Object} Detalle del cálculo RER
  */
 export const calcularRentaRER = (ingresosNetos) => {
-  const rentaCalculada = Math.round(ingresosNetos * TASA_RENTA_RER * 100) / 100;
+  const rentaCalculada = Math.round(ingresosNetos * TASA_RENTA_RER);
   
   return {
     regimenAplicado: 'RER',
@@ -140,8 +141,8 @@ export const calcularRentaMYPE = (ingresosNetos, coeficiente = null) => {
   const coeficienteAplicado = (coeficiente && coeficiente > TASA_MINIMA_MYPE) 
     ? coeficiente 
     : TASA_MINIMA_MYPE;
-  
-  const rentaCalculada = Math.round(ingresosNetos * coeficienteAplicado * 100) / 100;
+
+  const rentaCalculada = Math.round(ingresosNetos * coeficienteAplicado);
   
   return {
     regimenAplicado: 'MYPE',
@@ -170,8 +171,8 @@ export const calcularRentaGeneral = (ingresosNetos, coeficiente = null) => {
   const coeficienteAplicado = (coeficiente && coeficiente > TASA_MINIMA_GENERAL) 
     ? coeficiente 
     : TASA_MINIMA_GENERAL;
-  
-  const rentaCalculada = Math.round(ingresosNetos * coeficienteAplicado * 100) / 100;
+
+  const rentaCalculada = Math.round(ingresosNetos * coeficienteAplicado);
   
   return {
     regimenAplicado: 'GENERAL',
@@ -281,7 +282,7 @@ export const calcularDeclaracionCompleta = (params) => {
   // Total a pagar
   const igvAPagar = detalleIGV?.igvAPagar || 0;
   const rentaAPagar = detalleRenta.rentaAPagar || 0;
-  const totalAPagar = Math.round((igvAPagar + rentaAPagar) * 100) / 100;
+  const totalAPagar = Math.round(igvAPagar + rentaAPagar);
   
   return {
     regimen,
@@ -377,11 +378,11 @@ export const calcularPlanilla = (params = {}) => {
   const baseRemuneraciones = totalRemuneraciones || (totalRemuneracionesONP + totalRemuneracionesAFP);
 
   // ONP = 13% SOLO sobre remuneraciones de trabajadores en ONP (calculado automáticamente)
-  const onp = Math.round(totalRemuneracionesONP * TASA_ONP * 100) / 100;
+  const onp = Math.round(totalRemuneracionesONP * TASA_ONP);
 
   // ESSALUD y SIS: montos ingresados manualmente por el contador
   // Ref: ESSALUD = 9% × totalRemuneraciones; SIS-MYPE ≈ S/ 15 por trabajador
-  const totalAPagar = Math.round((essalud + sis + onp + retenciones5ta + vidaLey) * 100) / 100;
+  const totalAPagar = Math.round(essalud + sis + onp + retenciones5ta + vidaLey);
 
   return {
     cantidadTrabajadores: totalTrabajadores,
@@ -432,16 +433,16 @@ export const calcularAFP = (params = {}) => {
   const tasas = AFP_TASAS[afpNombre] || { comision: 0, primaSeguro: 0 };
 
   // Aporte obligatorio: 10% de la remuneración
-  const aporteObligatorio = Math.round(totalRemuneraciones * TASA_AFP_APORTE * 100) / 100;
+  const aporteObligatorio = Math.round(totalRemuneraciones * TASA_AFP_APORTE);
 
   // Comisión AFP (varía por AFP)
-  const comisionAFP = Math.round(totalRemuneraciones * tasas.comision * 100) / 100;
+  const comisionAFP = Math.round(totalRemuneraciones * tasas.comision);
 
   // Prima de seguro (~1.86%)
-  const primaSeguro = Math.round(totalRemuneraciones * tasas.primaSeguro * 100) / 100;
+  const primaSeguro = Math.round(totalRemuneraciones * tasas.primaSeguro);
 
   // Total
-  const totalAPagar = Math.round((aporteObligatorio + comisionAFP + primaSeguro + aporteVoluntario) * 100) / 100;
+  const totalAPagar = Math.round(aporteObligatorio + comisionAFP + primaSeguro + aporteVoluntario);
 
   return {
     afpNombre,

@@ -12,6 +12,77 @@ import logger from '../utils/logger.js';
  * Gestión de declaraciones tributarias de clientes contables
  */
 
+/**
+ * Saldo a favor de IGV que arrastra un cliente hacia un periodo dado.
+ * Se toma directamente del `saldoFavorSiguiente` de la declaración IGV/Renta activa
+ * más reciente ANTERIOR a ese periodo — no necesariamente el mes calendario
+ * inmediato anterior, para que funcione correctamente si hay meses sin declarar
+ * o si una declaración fue eliminada. Es la única fuente de verdad, no se acepta
+ * desde el cliente (evita que se digite mal o se olvide arrastrar el saldo).
+ */
+const obtenerSaldoFavorAnterior = async (clienteId, periodo) => {
+  const declaracionPrevia = await DeclaracionMensual.findOne({
+    clienteId,
+    tipo: 'IGV_RENTA',
+    activo: true,
+    periodo: { $lt: periodo }
+  }).sort({ periodo: -1 }).lean();
+
+  return declaracionPrevia?.detalleIGV?.saldoFavorSiguiente || 0;
+};
+
+/**
+ * Recalcula en cascada el saldo a favor de IGV de las declaraciones posteriores
+ * a un periodo dado. Se usa al ELIMINAR una declaración, ya que rompe la cadena
+ * de arrastre para los meses siguientes que ya se calcularon en base a ella.
+ * No se usa al editar (el usuario decidió que no hace falta recalcular en cascada
+ * en ese caso). Se detiene en la primera declaración PAGADA para no alterar cifras
+ * ya presentadas/pagadas ante SUNAT — esos periodos quedan marcados para revisión manual.
+ */
+const recalcularCadenaSaldoFavor = async (clienteId, periodoDesde) => {
+  const cliente = await ClienteContable.findById(clienteId);
+  if (!cliente) return [];
+
+  const siguientes = await DeclaracionMensual.find({
+    clienteId,
+    tipo: 'IGV_RENTA',
+    activo: true,
+    periodo: { $gt: periodoDesde }
+  }).sort({ periodo: 1 });
+
+  const requierenRevisionManual = [];
+
+  for (const decl of siguientes) {
+    if (decl.estado === 'PAGADO') {
+      requierenRevisionManual.push(decl.periodo);
+      break; // no seguimos más allá de una declaración ya pagada
+    }
+    if (!decl.detalleIGV) continue; // RUS u otro caso sin cálculo de IGV, no rompe la cadena
+
+    const saldoFavorArrastrado = await obtenerSaldoFavorAnterior(clienteId, decl.periodo);
+    const calculo = calcularDeclaracionCompleta({
+      regimen: cliente.regimenTributario,
+      ventasGravadas: decl.detalleIGV.ventasGravadas || 0,
+      creditoFiscal: decl.detalleIGV.creditoFiscal || 0,
+      saldoFavorAnterior: saldoFavorArrastrado,
+      coeficiente: decl.detalleRenta?.coeficienteAplicado,
+      categoriaRUS: decl.detalleRenta?.categoriaRUS,
+      zonaIGV: cliente.zonaIGV || 'GRAVADA'
+    });
+
+    if (calculo.detalleIGV) {
+      decl.detalleIGV.saldoFavorAnterior = calculo.detalleIGV.saldoFavorAnterior;
+      decl.detalleIGV.igvResultante = calculo.detalleIGV.igvResultante;
+      decl.detalleIGV.igvAPagar = calculo.detalleIGV.igvAPagar;
+      decl.detalleIGV.saldoFavorSiguiente = calculo.detalleIGV.saldoFavorSiguiente;
+    }
+    decl.totalAPagar = calculo.resumen.totalAPagar;
+    await decl.save();
+  }
+
+  return requierenRevisionManual;
+};
+
 // ========================================
 // ➕ REGISTRAR DECLARACIÓN
 // ========================================
@@ -39,8 +110,10 @@ export const registrarDeclaracion = async (req, res) => {
       ventasGravadas,
       ventasNoGravadas,
       ventasExportacion,
+      comprasGravadas,
+      comprasGravadasEspecial,
       creditoFiscal,
-      saldoFavorAnterior,
+      // saldoFavorAnterior no se acepta del body: se calcula server-side (ver obtenerSaldoFavorAnterior)
       coeficiente,
       categoriaRUS,
       formulario,
@@ -152,11 +225,14 @@ export const registrarDeclaracion = async (req, res) => {
       
     } else {
       // IGV_RENTA (comportamiento existente)
+      // El saldo a favor arrastrado NO se acepta del cliente: se calcula siempre
+      // a partir del saldoFavorSiguiente de la declaración del mes anterior.
+      const saldoFavorArrastrado = await obtenerSaldoFavorAnterior(clienteId, periodo);
       const calculo = calcularDeclaracionCompleta({
         regimen: cliente.regimenTributario,
         ventasGravadas: ventasGravadas || 0,
         creditoFiscal: creditoFiscal || 0,
-        saldoFavorAnterior: saldoFavorAnterior || 0,
+        saldoFavorAnterior: saldoFavorArrastrado,
         coeficiente: coeficiente || cliente.configuracionTributaria?.coeficienteRenta,
         categoriaRUS: categoriaRUS || cliente.configuracionTributaria?.categoriaRUS,
         zonaIGV: cliente.zonaIGV || 'GRAVADA'
@@ -166,6 +242,8 @@ export const registrarDeclaracion = async (req, res) => {
         ventasGravadas: ventasGravadas || 0,
         ventasNoGravadas: ventasNoGravadas || 0,
         ventasExportacion: ventasExportacion || 0,
+        comprasGravadas: comprasGravadas || 0,
+        comprasGravadasEspecial: comprasGravadasEspecial || 0,
         debitoFiscal: calculo.detalleIGV.debitoFiscal,
         creditoFiscal: calculo.detalleIGV.creditoFiscal,
         igvResultante: calculo.detalleIGV.igvResultante,
@@ -271,19 +349,19 @@ export const calcularImpuestosPreview = async (req, res) => {
   try {
     const {
       clienteId,
+      periodo,
       ventasGravadas,
       creditoFiscal,
-      saldoFavorAnterior,
       coeficiente,
       categoriaRUS,
       regimen // Opcional: usar si no se pasa clienteId
     } = req.body;
-    
+
     let regimenCalculo = regimen;
     let coeficienteCalculo = coeficiente;
     let categoriaCalculo = categoriaRUS;
     let zonaIGVCalculo = 'GRAVADA';
-    
+
     // Si se pasa clienteId, obtener régimen del cliente
     if (clienteId) {
       const cliente = await ClienteContable.findById(clienteId);
@@ -294,19 +372,25 @@ export const calcularImpuestosPreview = async (req, res) => {
         zonaIGVCalculo = cliente.zonaIGV || 'GRAVADA';
       }
     }
-    
+
     if (!regimenCalculo) {
       return res.status(400).json({
         success: false,
         message: 'Se requiere un régimen tributario o un clienteId válido'
       });
     }
-    
+
+    // El saldo a favor arrastrado no se acepta del body: se calcula server-side
+    // a partir de la declaración del mes anterior (requiere clienteId + periodo).
+    const saldoFavorArrastrado = (clienteId && periodo)
+      ? await obtenerSaldoFavorAnterior(clienteId, periodo)
+      : 0;
+
     const resultado = calcularDeclaracionCompleta({
       regimen: regimenCalculo,
       ventasGravadas: ventasGravadas || 0,
       creditoFiscal: creditoFiscal || 0,
-      saldoFavorAnterior: saldoFavorAnterior || 0,
+      saldoFavorAnterior: saldoFavorArrastrado,
       coeficiente: coeficienteCalculo,
       categoriaRUS: categoriaCalculo,
       zonaIGV: zonaIGVCalculo
@@ -503,20 +587,23 @@ export const actualizarDeclaracion = async (req, res) => {
       observaciones,
       // Recalculation fields (optional)
       ventasGravadas,
+      comprasGravadas,
+      comprasGravadasEspecial,
       creditoFiscal,
-      saldoFavorAnterior,
+      // saldoFavorAnterior no se acepta del body: se calcula server-side (ver obtenerSaldoFavorAnterior)
       coeficiente
     } = req.body;
-    
+
     // If calculation fields provided, recalculate amounts
     if (ventasGravadas !== undefined || creditoFiscal !== undefined) {
       const cliente = await ClienteContable.findById(declaracion.clienteId);
       if (cliente) {
+        const saldoFavorArrastrado = await obtenerSaldoFavorAnterior(declaracion.clienteId, declaracion.periodo);
         const calculo = calcularDeclaracionCompleta({
           regimen: cliente.regimenTributario,
           ventasGravadas: ventasGravadas ?? 0,
           creditoFiscal: creditoFiscal ?? 0,
-          saldoFavorAnterior: saldoFavorAnterior ?? 0,
+          saldoFavorAnterior: saldoFavorArrastrado,
           coeficiente: coeficiente || cliente.configuracionTributaria?.coeficienteRenta,
           categoriaRUS: cliente.configuracionTributaria?.categoriaRUS,
           zonaIGV: cliente.zonaIGV || 'GRAVADA'
@@ -524,6 +611,8 @@ export const actualizarDeclaracion = async (req, res) => {
         if (calculo.detalleIGV) {
           declaracion.detalleIGV = {
             ventasGravadas: ventasGravadas ?? 0,
+            comprasGravadas: comprasGravadas ?? 0,
+            comprasGravadasEspecial: comprasGravadasEspecial ?? 0,
             debitoFiscal: calculo.detalleIGV.debitoFiscal,
             creditoFiscal: calculo.detalleIGV.creditoFiscal,
             igvResultante: calculo.detalleIGV.igvResultante,
@@ -869,11 +958,23 @@ export const eliminarDeclaracion = async (req, res) => {
       : '[ELIMINADA POR ADMINISTRADOR]';
     await declaracion.save();
 
+    // Eliminar rompe la cadena de arrastre del saldo a favor de IGV: recalculamos
+    // los meses siguientes para que reflejen la nueva realidad (solo aplica a IGV_RENTA).
+    let mesesPendientesDeRevision = [];
+    if (declaracion.tipo === 'IGV_RENTA') {
+      mesesPendientesDeRevision = await recalcularCadenaSaldoFavor(declaracion.clienteId, declaracion.periodo);
+    }
+
     logger.info(`Declaración ${id} eliminada (tipo: ${declaracion.tipo}, periodo: ${declaracion.periodo})`);
+    if (mesesPendientesDeRevision.length > 0) {
+      logger.warn(`Saldo a favor no recalculado automáticamente en periodos ya pagados: ${mesesPendientesDeRevision.join(', ')} (cliente ${declaracion.clienteId}). Requiere revisión manual.`);
+    }
 
     res.json({
       success: true,
-      message: `Declaración ${declaracion.tipo} del periodo ${declaracion.periodo} eliminada correctamente`
+      message: `Declaración ${declaracion.tipo} del periodo ${declaracion.periodo} eliminada correctamente`,
+      saldoFavorRecalculado: declaracion.tipo === 'IGV_RENTA',
+      periodosPendientesDeRevisionManual: mesesPendientesDeRevision
     });
   } catch (error) {
     logger.error('Error eliminando declaración:', error);

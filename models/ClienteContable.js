@@ -261,6 +261,14 @@ const clienteContableSchema = new mongoose.Schema(
         max: 1,
         default: null // null = usar porcentaje mínimo (1% ó 1.5%)
       },
+      // Tasa especial de IGV para compras beneficiadas (ej. restaurantes/hospedaje - Ley 31556).
+      // Configurable por cliente porque SUNAT puede modificar el porcentaje.
+      tasaIGVEspecialCompras: {
+        type: Number,
+        min: 0,
+        max: 1,
+        default: 0.10
+      },
       // Actividad económica
       actividadEconomica: {
         type: String,
@@ -344,7 +352,11 @@ const clienteContableSchema = new mongoose.Schema(
       type: String,
       enum: ['activo', 'suspendido', 'baja'],
       default: 'activo',
-      index: true
+      index: true,
+      // Almacenado en minúscula; expuesto en mayúscula porque así lo esperan
+      // los tipos y comparaciones del frontend (EstadoCliente: 'ACTIVO'|'SUSPENDIDO'|'BAJA')
+      get: (v) => (v ? v.toUpperCase() : v),
+      set: (v) => (v ? v.toLowerCase() : v)
     },
     motivoBaja: {
       type: String,
@@ -357,8 +369,8 @@ const clienteContableSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
+    toJSON: { virtuals: true, getters: true },
+    toObject: { virtuals: true, getters: true }
   }
 );
 
