@@ -38,6 +38,21 @@ const TASA_MINIMA_MYPE = 0.01; // 1%
 const TASA_MINIMA_GENERAL = 0.015; // 1.5%
 
 // ========================================
+// 📅 CONSTANTES DE LA DECLARACIÓN JURADA ANUAL (Formulario Virtual 710)
+// ========================================
+
+// Valor de la UIT vigente (referencial; se puede pasar uno distinto por año)
+const UIT_ANUAL = 5350;
+
+// MYPE Tributario: 10% hasta 15 UIT de renta neta anual, 29.5% sobre el exceso
+const LIMITE_UIT_MYPE_ANUAL = 15;
+const TASA_ANUAL_MYPE_TRAMO1 = 0.10;
+const TASA_ANUAL_MYPE_TRAMO2 = 0.295;
+
+// Régimen General: tasa plana de 29.5% sobre toda la renta neta anual
+const TASA_ANUAL_GENERAL = 0.295;
+
+// ========================================
 // 🧮 FUNCIONES DE CÁLCULO
 // ========================================
 
@@ -298,6 +313,55 @@ export const calcularDeclaracionCompleta = (params) => {
   };
 };
 
+/**
+ * 📅 Calcular Declaración Jurada Anual de Renta (Formulario Virtual 710)
+ * Aplica tramos por UIT sobre la renta neta anual y concilia contra los pagos
+ * a cuenta mensuales ya realizados durante el año.
+ * @param {string} regimen - 'MYPE' o 'GENERAL' (únicos regímenes que regularizan anualmente)
+ * @param {number} rentaNetaAnual - Renta neta anual sobre la que se calcula el impuesto
+ * @param {number} totalPagosACuenta - Suma de los pagos a cuenta mensuales de renta del año
+ * @param {number} uit - Valor de la UIT del ejercicio (por si cambia año a año)
+ * @returns {Object} Detalle del cálculo anual
+ */
+export const calcularRentaAnual = (regimen, rentaNetaAnual = 0, totalPagosACuenta = 0, uit = UIT_ANUAL) => {
+  if (regimen !== 'MYPE' && regimen !== 'GENERAL') {
+    throw new Error('La Declaración Jurada Anual de Renta solo aplica a régimen MYPE Tributario o Régimen General');
+  }
+
+  let tramo1Base = 0, tramo1Tasa = 0, tramo1Impuesto = 0;
+  let tramo2Base = 0, tramo2Tasa = 0, tramo2Impuesto = 0;
+
+  if (regimen === 'MYPE') {
+    const limiteTramo1 = uit * LIMITE_UIT_MYPE_ANUAL;
+    tramo1Base = Math.min(rentaNetaAnual, limiteTramo1);
+    tramo1Tasa = TASA_ANUAL_MYPE_TRAMO1;
+    tramo1Impuesto = Math.round(tramo1Base * tramo1Tasa);
+
+    tramo2Base = Math.max(0, rentaNetaAnual - limiteTramo1);
+    tramo2Tasa = TASA_ANUAL_MYPE_TRAMO2;
+    tramo2Impuesto = Math.round(tramo2Base * tramo2Tasa);
+  } else {
+    // GENERAL: tasa plana sobre toda la renta neta anual
+    tramo1Base = rentaNetaAnual;
+    tramo1Tasa = TASA_ANUAL_GENERAL;
+    tramo1Impuesto = Math.round(tramo1Base * tramo1Tasa);
+  }
+
+  const impuestoCalculado = tramo1Impuesto + tramo2Impuesto;
+  const diferencia = impuestoCalculado - Math.round(totalPagosACuenta);
+
+  return {
+    regimen,
+    rentaNetaAnual,
+    uitAplicada: uit,
+    tramos: { tramo1Base, tramo1Tasa, tramo1Impuesto, tramo2Base, tramo2Tasa, tramo2Impuesto },
+    impuestoCalculado,
+    totalPagosACuenta: Math.round(totalPagosACuenta),
+    saldoAPagar: Math.max(0, diferencia),
+    saldoAFavor: Math.max(0, -diferencia)
+  };
+};
+
 // ========================================
 // 📊 CONSTANTES LABORALES
 // ========================================
@@ -469,6 +533,7 @@ export default {
   calcularRentaMYPE,
   calcularRentaGeneral,
   calcularDeclaracionCompleta,
+  calcularRentaAnual,
   calcularPlanilla,
   calcularAFP,
   CONSTANTES_TRIBUTARIAS

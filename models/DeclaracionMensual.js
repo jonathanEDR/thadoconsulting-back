@@ -502,7 +502,12 @@ const declaracionMensualSchema = new mongoose.Schema(
 // ========================================
 // 🔍 ÍNDICES COMPUESTOS
 // ========================================
-declaracionMensualSchema.index({ clienteId: 1, periodo: 1, tipo: 1 }, { unique: true });
+// Único solo entre declaraciones activas: al eliminar (soft-delete, activo:false)
+// una declaración, debe poder registrarse una nueva para el mismo cliente/periodo/tipo.
+declaracionMensualSchema.index(
+  { clienteId: 1, periodo: 1, tipo: 1 },
+  { unique: true, partialFilterExpression: { activo: true } }
+);
 declaracionMensualSchema.index({ periodo: 1, estado: 1, activo: 1 });
 declaracionMensualSchema.index({ fechaVencimiento: 1, estado: 1 });
 declaracionMensualSchema.index({ anio: 1, clienteId: 1, activo: 1 });

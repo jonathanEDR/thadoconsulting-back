@@ -39,6 +39,16 @@ import {
   eliminarDeclaracion,
 } from '../controllers/declaracionesController.js';
 
+// Controllers de Declaración Jurada Anual de Renta (Formulario 710)
+import {
+  getSugerenciaRentaAnual,
+  calcularPreviewAnual,
+  registrarDeclaracionAnual,
+  listarDeclaracionesAnuales,
+  actualizarDeclaracionAnual,
+  eliminarDeclaracionAnual
+} from '../controllers/declaracionAnualController.js';
+
 // Controllers de Proyecciones
 import {
   calcularProyeccion,
@@ -115,6 +125,16 @@ router.get('/declaraciones/resumen-anual/:clienteId', getResumenAnual);         
 router.put('/declaraciones/:id', actualizarDeclaracion);                        // PUT    /api/contabilidad/declaraciones/:id
 router.patch('/declaraciones/:id/estado', cambiarEstadoDeclaracion);            // PATCH  /api/contabilidad/declaraciones/:id/estado
 router.delete('/declaraciones/:id', eliminarDeclaracion);                       // DELETE /api/contabilidad/declaraciones/:id
+
+// ========================================
+// 📅 DECLARACIÓN JURADA ANUAL DE RENTA (Formulario 710)
+// ========================================
+router.get('/declaraciones-anuales/sugerencia', getSugerenciaRentaAnual);       // GET    /api/contabilidad/declaraciones-anuales/sugerencia?clienteId=&anio=
+router.post('/declaraciones-anuales/calcular', calcularPreviewAnual);           // POST   /api/contabilidad/declaraciones-anuales/calcular
+router.post('/declaraciones-anuales', registrarDeclaracionAnual);               // POST   /api/contabilidad/declaraciones-anuales
+router.get('/declaraciones-anuales/cliente/:clienteId', listarDeclaracionesAnuales); // GET  /api/contabilidad/declaraciones-anuales/cliente/:clienteId
+router.put('/declaraciones-anuales/:id', actualizarDeclaracionAnual);           // PUT    /api/contabilidad/declaraciones-anuales/:id
+router.delete('/declaraciones-anuales/:id', eliminarDeclaracionAnual);          // DELETE /api/contabilidad/declaraciones-anuales/:id
 
 // ========================================
 // 📊 PROYECCIONES DE PAGO
